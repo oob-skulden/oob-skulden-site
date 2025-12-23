@@ -1,21 +1,98 @@
-*.backup*
-hugo.toml.backup*
-*.backup*
-hugo.toml.backup*
-
-# Hugo local backups
-hugo.toml.backup*
-*.backup*
-# Hugo generated files
-/public/
+# ============================================
+# Hugo Build Artifacts
+# ============================================
+# NOTE: /public/ is commented out because you use pre-build workflow
+# Uncomment if you switch to Netlify-builds workflow
+# /public/
 /resources/
 /.hugo_build.lock
 
-# Local backups
-*.tar.gz
-*.backup*
-hugo.toml.backup*
+# ============================================
+# Backup Files
+# ============================================
+*.backup
+*.backup-*
+*.bak
+*.old
+*.tmp
+*~
+*.orig
 
-# OS/editor noise
+# ============================================
+# Archives
+# ============================================
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# ============================================
+# Editor/IDE Files
+# ============================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains
+.idea/
+*.iml
+*.iws
+
+# Vim
+*.swp
+*.swo
+
+# Emacs
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ============================================
+# OS Files
+# ============================================
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+.Trash-*
+
+# ============================================
+# Environment & Secrets
+# ============================================
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets/
+credentials/
+
+# ============================================
+# Logs
+# ============================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================
+# Dependencies
+# ============================================
+node_modules/
+
+# ============================================
+# Temporary Hugo Files
+# ============================================
+hugo_stats.json
