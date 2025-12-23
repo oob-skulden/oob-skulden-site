@@ -2,3 +2,7 @@
 hugo.toml.backup*
 *.backup*
 hugo.toml.backup*
+
+# Hugo local backups
+hugo.toml.backup*
+*.backup*
