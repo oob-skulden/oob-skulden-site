@@ -1,0 +1,4 @@
+/* Header logo spacing (PaperMod loads assets/css/extended/*.css automatically) */
+.header .logo img {
+  padding: 4px 6px;
+}

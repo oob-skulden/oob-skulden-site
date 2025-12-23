@@ -41,7 +41,24 @@ Every article includes:
 
 ## About Oob Skulden
 
-Security practitioner focused on the "boring but critical" components that organizations deploy without proper security consideration.
+
+**Oob Skulden** is my pseudonym name. My real name is **Bob Walden**.
+
+I’ve spent **over 30 years** building and operating systems across multiple generations of technology — from early enterprise environments to modern cloud platforms. My background includes deep, hands-on work with both Windows and Linux, long before either was considered “easy.”
+
+Over the course of my career, I’ve worked across infrastructure, networking, data, and consulting roles, and I’ve spent **the last 15+ years focused on security** — not as an abstract discipline, but as something that has to function under real-world constraints.
+
+Today, I work in cybersecurity at a large organization (**company name intentionally redacted**). The views and content here are my own and are not affiliated with my employer.
+
+## Why this site exists
+
+Most security guidance assumes unlimited budget, time, and specialization.
+
+Most teams don’t have that.
+
+This site focuses on practical cloud security for small teams: concrete detection ideas, realistic remediation patterns, and attention to the overlooked parts of modern systems where risk tends to accumulate quietly.
+
+If you’re responsible for security *and* everything else, you’re in the right place.
 
 **Homelab environment:** Proxmox cluster, HashiCorp Vault, multi-cloud free tier deployments
 
@@ -49,8 +66,21 @@ Security practitioner focused on the "boring but critical" components that organ
 
 ---
 
-**Connect:**
-- [LinkedIn](https://www.linkedin.com/in/stonepedal/) - Professional updates
-- [Reddit](https://www.reddit.com/user/oobskulden/) - Community discussions
-- [X/Twitter](https://x.com/oobskulden) - Quick updates
-- [RSS](/index.xml) - Get every article
+## Connect
+
+- **[GitHub](https://github.com/oob-skulden/oob-skulden-site)** - Code, tools, and examples
+- **[LinkedIn](https://www.linkedin.com/in/stonepedal/)** - Professional updates
+- **[Reddit](https://www.reddit.com/user/oobskulden/)** - Community discussions (r/netsec, r/cybersecurity)
+- **[X/Twitter](https://x.com/oobskulden)** - Quick updates and threads
+- **[RSS Feed](/index.xml)** - Get every article in your reader
+
+## Discuss Articles
+
+Found something useful? Have questions? Share on:
+- **Hacker News** - Use the share button on any article
+- **Reddit** - Post to r/netsec, r/cybersecurity, r/aws
+- **LinkedIn** - Tag me in your share for discussion
+
+---
+
+*All code and queries on this site are tested in my homelab before publication.*

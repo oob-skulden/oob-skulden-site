@@ -1,6 +1,6 @@
 baseURL = 'http://localhost:1313/'
 languageCode = 'en-us'
-title = 'The Overlooked Cloud Security Expert'
+title = 'Oob Skulden'
 theme = 'PaperMod'
 
 relativeURLs = false
@@ -46,7 +46,11 @@ Real detection queries. Actual remediation code.
       name = "About"
       url = "/about"
 
-  # Your actual social media accounts
+  # All social media accounts
+  [[params.socialIcons]]
+    name = "github"
+    url = "https://github.com/oob-skulden/oob-skulden-site"
+  
   [[params.socialIcons]]
     name = "linkedin"
     url = "https://www.linkedin.com/in/stonepedal/"
@@ -110,3 +114,9 @@ Real detection queries. Actual remediation code.
 
 [permalinks]
   posts = "/:year/:month/:title/"
+[params.label]
+  text = "Oob Skulden"
+  subtitle = """Security patterns, failures, and fixes — from the trenches."""
+  icon = "/images/oob.png"
+  iconHeight = 60
+
