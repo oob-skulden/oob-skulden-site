@@ -1,2 +1,4 @@
 *.backup*
 hugo.toml.backup*
+*.backup*
+hugo.toml.backup*
