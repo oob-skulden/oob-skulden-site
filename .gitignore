@@ -6,3 +6,16 @@ hugo.toml.backup*
 # Hugo local backups
 hugo.toml.backup*
 *.backup*
+# Hugo generated files
+/public/
+/resources/
+/.hugo_build.lock
+
+# Local backups
+*.tar.gz
+*.backup*
+hugo.toml.backup*
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
