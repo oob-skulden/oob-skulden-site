@@ -96,3 +96,6 @@ node_modules/
 # Temporary Hugo Files
 # ============================================
 hugo_stats.json
+*.backup*
+*.bak
+*~
