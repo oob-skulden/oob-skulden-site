@@ -99,3 +99,6 @@ hugo_stats.json
 *.backup*
 *.bak
 *~
+*.backup*
+*.bak
+*~
