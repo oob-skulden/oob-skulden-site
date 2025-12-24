@@ -1,4 +1,4 @@
-baseURL = 'http://localhost:1313/'
+baseURL = 'https://oobskulden.com:1313/'
 languageCode = 'en-us'
 title = 'Oob Skulden'
 theme = 'PaperMod'

@@ -5,6 +5,8 @@
 # Uncomment if you switch to Netlify-builds workflow
 # /public/
 /resources/
+/public/
+/resources/_gen/
 /.hugo_build.lock
 
 # ============================================

@@ -42,7 +42,7 @@ Every article includes:
 ## About Oob Skulden
 
 
-**Oob Skulden** is my pseudonym name. My real name is **Bob Walden**.
+**Oob Skulden** is my pseudonym name.
 
 I’ve spent **over 30 years** building and operating systems across multiple generations of technology — from early enterprise environments to modern cloud platforms. My background includes deep, hands-on work with both Windows and Linux, long before either was considered “easy.”
 
