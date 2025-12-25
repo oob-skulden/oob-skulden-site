@@ -2,6 +2,7 @@
 # ultimate-security-audit.sh
 # Complete security audit for Hugo sites and web projects
 # Includes: secrets, backups, exposure risks, code quality, metadata leaks
+# Enhanced with: supply chain, shortcodes, Netlify leaks, RSS/sitemap disclosure
 
 set -euo pipefail
 
@@ -148,7 +149,7 @@ echo ""
 
 SECRETS_FOUND=0
 
-# Secret patterns
+# Secret patterns (enhanced with Netlify tokens)
 declare -A SECRET_PATTERNS=(
     ["API Keys"]="['\"]?api[_-]?key['\"]?\s*=\s*['\"][^'\"]+['\"]"
     ["Access Tokens"]="['\"]?access[_-]?token['\"]?\s*=\s*['\"][^'\"]+['\"]"
@@ -160,6 +161,8 @@ declare -A SECRET_PATTERNS=(
     ["Private Keys"]="-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----"
     ["Passwords"]="['\"]?password['\"]?\s*=\s*['\"][^'\"]+['\"]"
     ["Database URLs"]="postgres://|mysql://|mongodb://"
+    ["Netlify Auth Tokens"]="NETLIFY_AUTH_TOKEN"
+    ["Netlify Site IDs"]="NETLIFY_SITE_ID"
 )
 
 # Find config files
@@ -311,12 +314,12 @@ echo ""
 
 INTERNAL_REFS=0
 if [[ -d "$SCAN_DIR/public" ]]; then
-    # Look for localhost, 127.0.0.1, private IPs
-    INTERNAL_URLS=$(grep -riE "(localhost|127\.0\.0\.1|192\.168\.|10\.0\.|172\.(1[6-9]|2[0-9]|3[01])\.)" "$SCAN_DIR/public" 2>/dev/null | wc -l || true)
+    # Look for localhost, 127.0.0.1, private IPs, Docker/K8s patterns
+    INTERNAL_URLS=$(grep -riE "(localhost|127\.0\.0\.1|192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|\.local|\.internal|docker\.sock)" "$SCAN_DIR/public" 2>/dev/null | wc -l || true)
     
     if [[ $INTERNAL_URLS -gt 0 ]]; then
         echo -e "${YELLOW}⚠️  Found $INTERNAL_URLS reference(s) to internal URLs/IPs [MEDIUM]${NC}"
-        grep -riE "(localhost|127\.0\.0\.1|192\.168\.|10\.0\.)" "$SCAN_DIR/public" 2>/dev/null | head -5 | sed 's/^/  /' || true
+        grep -riE "(localhost|127\.0\.0\.1|192\.168\.|10\.0\.|\.local|\.internal)" "$SCAN_DIR/public" 2>/dev/null | head -5 | sed 's/^/  /' || true
         echo "  ..."
         MEDIUM_ISSUES=$((MEDIUM_ISSUES + 1))
     else
@@ -571,6 +574,8 @@ if [[ -f "$SCAN_DIR/netlify.toml" ]]; then
         "X-Content-Type-Options"
         "Content-Security-Policy"
         "Strict-Transport-Security"
+        "Permissions-Policy"
+        "Referrer-Policy"
     )
     
     MISSING_HEADERS=()
@@ -687,6 +692,158 @@ fi
 echo ""
 
 # ============================================
+# CHECK 18: Hugo Module/Theme Supply Chain
+# ============================================
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${PURPLE}CHECK 18: Hugo Module/Theme Supply Chain${NC}"
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+# Check go.mod for Hugo modules (often overlooked attack surface)
+if [[ -f "$SCAN_DIR/go.mod" ]]; then
+    echo -e "${BLUE}ℹ️  Hugo modules detected - checking dependencies${NC}"
+    
+    # Look for modules pointing to non-official sources
+    NON_OFFICIAL=$(grep -E "github\.com/[^/]+/[^/]+" "$SCAN_DIR/go.mod" | grep -v "gohugoio" | wc -l || true)
+    
+    if [[ $NON_OFFICIAL -gt 0 ]]; then
+        echo -e "${YELLOW}⚠️  Found $NON_OFFICIAL third-party Hugo module(s) [MEDIUM]${NC}"
+        echo "  Third-party modules can execute code during build"
+        grep -E "github\.com/[^/]+/[^/]+" "$SCAN_DIR/go.mod" | grep -v "gohugoio" | sed 's/^/  /'
+        MEDIUM_ISSUES=$((MEDIUM_ISSUES + 1))
+    else
+        echo -e "${GREEN}✓ Only official Hugo modules in use${NC}"
+    fi
+fi
+
+# Check themes/ directory for git submodules (supply chain risk)
+if [[ -d "$SCAN_DIR/themes" ]]; then
+    THEME_COUNT=$(find "$SCAN_DIR/themes" -mindepth 1 -maxdepth 1 -type d | wc -l)
+    if [[ $THEME_COUNT -gt 0 ]]; then
+        echo -e "${BLUE}ℹ️  Found $THEME_COUNT theme(s) - checking origins${NC}"
+        
+        # Check if themes are git submodules (better) or copied (worse)
+        for theme_dir in "$SCAN_DIR/themes"/*; do
+            if [[ -d "$theme_dir/.git" ]]; then
+                REMOTE=$(cd "$theme_dir" && git remote get-url origin 2>/dev/null || echo "unknown")
+                echo -e "  ${GREEN}✓${NC} $(basename "$theme_dir"): git submodule ($REMOTE)"
+            else
+                echo -e "  ${YELLOW}⚠️${NC} $(basename "$theme_dir"): copied theme (no version tracking)"
+                MEDIUM_ISSUES=$((MEDIUM_ISSUES + 1))
+            fi
+        done
+    fi
+else
+    echo -e "${GREEN}✓ No themes directory found${NC}"
+fi
+echo ""
+
+# ============================================
+# CHECK 19: Custom Shortcode Security
+# ============================================
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${PURPLE}CHECK 19: Custom Shortcode Injection Risks${NC}"
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+if [[ -d "$SCAN_DIR/layouts/shortcodes" ]]; then
+    SHORTCODE_COUNT=$(find "$SCAN_DIR/layouts/shortcodes" -name "*.html" | wc -l)
+    
+    if [[ $SHORTCODE_COUNT -gt 0 ]]; then
+        echo -e "${BLUE}ℹ️  Found $SHORTCODE_COUNT custom shortcode(s)${NC}"
+        
+        # Check for unsafe functions in shortcodes
+        UNSAFE_SHORTCODES=$(grep -rE "(\.Get|\.Inner|readFile|getJSON|getCSV)" "$SCAN_DIR/layouts/shortcodes" --include="*.html" 2>/dev/null | wc -l || true)
+        
+        if [[ $UNSAFE_SHORTCODES -gt 0 ]]; then
+            echo -e "${YELLOW}⚠️  Found $UNSAFE_SHORTCODES shortcode(s) using dynamic content [MEDIUM]${NC}"
+            echo "  Shortcodes using .Get/.Inner can inject untrusted content"
+            grep -rE "(\.Get|\.Inner)" "$SCAN_DIR/layouts/shortcodes" --include="*.html" -l 2>/dev/null | sed 's/^/  /' || true
+            MEDIUM_ISSUES=$((MEDIUM_ISSUES + 1))
+        else
+            echo -e "${GREEN}✓ Shortcodes appear safe${NC}"
+        fi
+    fi
+else
+    echo -e "${GREEN}✓ No custom shortcodes found${NC}"
+fi
+echo ""
+
+# ============================================
+# CHECK 20: Netlify Build Logs/Env Leaks
+# ============================================
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${PURPLE}CHECK 20: Netlify Build Environment Exposure${NC}"
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+# Check if build logs might leak secrets
+if [[ -f "$SCAN_DIR/netlify.toml" ]]; then
+    # Look for build commands that echo/print env vars
+    ECHO_COMMANDS=$(grep -E "(echo|print|console\.log).*\\\$" "$SCAN_DIR/netlify.toml" 2>/dev/null | wc -l || true)
+    
+    if [[ $ECHO_COMMANDS -gt 0 ]]; then
+        echo -e "${YELLOW}⚠️  Found $ECHO_COMMANDS command(s) that might leak env vars in build logs [HIGH]${NC}"
+        grep -E "(echo|print|console\.log).*\\\$" "$SCAN_DIR/netlify.toml" 2>/dev/null | sed 's/^/  /' || true
+        HIGH_ISSUES=$((HIGH_ISSUES + 1))
+    else
+        echo -e "${GREEN}✓ No obvious env var leaks in build commands${NC}"
+    fi
+    
+    # Check for deploy previews exposing drafts
+    if ! grep -qi "publish = \"public\"" "$SCAN_DIR/netlify.toml"; then
+        echo -e "${YELLOW}⚠️  Publish directory not explicitly set - verify draft handling [LOW]${NC}"
+        LOW_ISSUES=$((LOW_ISSUES + 1))
+    fi
+else
+    echo -e "${GREEN}✓ No netlify.toml found${NC}"
+fi
+echo ""
+
+# ============================================
+# CHECK 21: RSS/Sitemap Unintended Disclosure
+# ============================================
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${PURPLE}CHECK 21: RSS/Sitemap Information Leaks${NC}"
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+RSS_SITEMAP_ISSUES=0
+
+if [[ -d "$SCAN_DIR/public" ]]; then
+    # Check if RSS includes draft/future posts
+    if [[ -f "$SCAN_DIR/public/index.xml" ]]; then
+        DRAFT_IN_RSS=$(grep -i "draft.*true" "$SCAN_DIR/public/index.xml" 2>/dev/null | wc -l || true)
+        
+        if [[ $DRAFT_IN_RSS -gt 0 ]]; then
+            echo -e "${RED}✗ RSS feed includes $DRAFT_IN_RSS draft post(s) [HIGH]${NC}"
+            echo "  Drafts should not be in RSS - check Hugo config"
+            HIGH_ISSUES=$((HIGH_ISSUES + 1))
+            RSS_SITEMAP_ISSUES=$((RSS_SITEMAP_ISSUES + 1))
+        fi
+    fi
+    
+    # Check sitemap for sensitive paths
+    if [[ -f "$SCAN_DIR/public/sitemap.xml" ]]; then
+        SENSITIVE_PATHS=$(grep -E "(admin|private|internal|test|staging)" "$SCAN_DIR/public/sitemap.xml" 2>/dev/null | wc -l || true)
+        
+        if [[ $SENSITIVE_PATHS -gt 0 ]]; then
+            echo -e "${YELLOW}⚠️  Sitemap includes $SENSITIVE_PATHS potentially sensitive path(s) [MEDIUM]${NC}"
+            grep -E "(admin|private|internal)" "$SCAN_DIR/public/sitemap.xml" 2>/dev/null | head -3 | sed 's/^/  /' || true
+            MEDIUM_ISSUES=$((MEDIUM_ISSUES + 1))
+            RSS_SITEMAP_ISSUES=$((RSS_SITEMAP_ISSUES + 1))
+        fi
+    fi
+    
+    if [[ $RSS_SITEMAP_ISSUES -eq 0 ]]; then
+        echo -e "${GREEN}✓ RSS and sitemap look clean${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️  No public/ directory found - skipping${NC}"
+fi
+echo ""
+
+# ============================================
 # FINAL SUMMARY
 # ============================================
 echo "=============================================="
@@ -725,8 +882,12 @@ if [[ $TOTAL_ISSUES -eq 0 ]]; then
     echo "  ✓ Clean public output directory"
     echo "  ✓ Good .gitignore coverage"
     echo "  ✓ No obvious vulnerabilities"
+    echo "  ✓ Supply chain security verified"
+    echo "  ✓ No shortcode injection risks"
+    echo "  ✓ Netlify build security confirmed"
+    echo "  ✓ RSS/sitemap properly configured"
     echo ""
-    echo "🦛Oob Skulden Approved! Stay vigilant, stay submerged."
+    echo "🦛 Bob-A-Potamus Approved! Stay vigilant, stay submerged."
 else
     echo -e "${YELLOW}⚠️  Found $TOTAL_ISSUES total security issue(s)${NC}"
     echo ""
