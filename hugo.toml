@@ -1,4 +1,4 @@
-baseURL = "https://oob-skulden.com"               # Custom domain with HTTPS
+baseURL = "https://oobskulden.com"               # Custom domain with HTTPS
 
 languageCode = 'en-us'
 title = 'Oob Skulden'
