@@ -114,3 +114,4 @@ hugo.development.toml
 
 # Netlify local dev artifacts (only if using `netlify dev`)
 .netlify/
+.hugo_build.lock
