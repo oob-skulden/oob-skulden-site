@@ -1,5 +1,3 @@
-# baseURL = "https://oob-skulden.netlify.app"       # Production Netlify URL
-# or
 baseURL = "https://oob-skulden.com"               # Custom domain with HTTPS
 
 languageCode = 'en-us'

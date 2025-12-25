@@ -28,6 +28,110 @@ fi
 
 echo "Scanning directory: $SCAN_DIR"
 echo ""
+# ============================================
+# OPTIONAL: Safe cleanup of Hugo build artifacts
+# ============================================
+# Usage:
+#   CLEAN=1 ./ultimate-security-audit.sh .
+#   CLEAN=1 REBUILD=1 ./ultimate-security-audit.sh .
+#   Or: ./ultimate-security-audit.sh --clean --rebuild .
+#
+# Safety rules:
+# - Never run cleanup unless explicitly enabled.
+# - Only deletes "$SCAN_DIR/public" and "$SCAN_DIR/resources/_gen"
+# - Refuses to run if SCAN_DIR resolves to /, $HOME, or empty.
+# - Supports "auto" mode: clean only if public/ looks dev-tainted.
+
+AUTO_CLEAN=0
+DO_CLEAN=0
+DO_REBUILD=0
+
+# Simple flag parsing (does not break existing positional SCAN_DIR usage)
+ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    --clean) DO_CLEAN=1 ;;
+    --rebuild) DO_REBUILD=1 ;;
+    --auto-clean) AUTO_CLEAN=1 ;;   # clean only if dev-tainted
+    *) ARGS+=("$arg") ;;
+  esac
+done
+
+# Re-assign SCAN_DIR from remaining args (preserves old behavior)
+SCAN_DIR="${ARGS[0]:-$SCAN_DIR}"
+
+# Env var support (lets you use CLEAN=1 REBUILD=1 style)
+[[ "${CLEAN:-0}" == "1" ]] && DO_CLEAN=1
+[[ "${REBUILD:-0}" == "1" ]] && DO_REBUILD=1
+[[ "${AUTO_CLEAN_ENV:-0}" == "1" ]] && AUTO_CLEAN=1
+
+# Resolve SCAN_DIR safely (best effort; readlink may not exist everywhere)
+REAL_SCAN_DIR="$SCAN_DIR"
+if command -v readlink >/dev/null 2>&1; then
+  REAL_SCAN_DIR="$(readlink -f "$SCAN_DIR" 2>/dev/null || echo "$SCAN_DIR")"
+fi
+
+safe_cleanup() {
+  # Refuse obviously dangerous targets
+  if [[ -z "${REAL_SCAN_DIR:-}" || "$REAL_SCAN_DIR" == "/" || "$REAL_SCAN_DIR" == "$HOME" ]]; then
+    echo -e "${RED}✗ Refusing cleanup: unsafe SCAN_DIR='$REAL_SCAN_DIR'${NC}"
+    echo "  Tip: run from your repo root and pass '.'"
+    return 1
+  fi
+
+  # Only allow cleanup if this looks like a Hugo project root
+  if [[ ! -f "$SCAN_DIR/hugo.toml" && ! -f "$SCAN_DIR/config.toml" && ! -f "$SCAN_DIR/config.yaml" && ! -d "$SCAN_DIR/content" ]]; then
+    echo -e "${YELLOW}⚠️  Cleanup skipped: '$SCAN_DIR' does not look like a Hugo site root${NC}"
+    return 0
+  fi
+
+  # Auto-clean gate (only clean if public/ looks dev-tainted)
+  if [[ "$AUTO_CLEAN" -eq 1 && -d "$SCAN_DIR/public" ]]; then
+    if ! grep -RqiE "(localhost|127\.0\.0\.1|192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)" "$SCAN_DIR/public" 2>/dev/null; then
+      echo -e "${GREEN}✓ Auto-clean: public/ does not appear dev-tainted; skipping cleanup${NC}"
+      return 0
+    fi
+  fi
+
+  echo -e "${BLUE}ℹ️  Cleanup enabled. Removing Hugo build artifacts:${NC}"
+  [[ -d "$SCAN_DIR/public" ]] && echo "  - $SCAN_DIR/public/"
+  [[ -d "$SCAN_DIR/resources/_gen" ]] && echo "  - $SCAN_DIR/resources/_gen/"
+  [[ ! -d "$SCAN_DIR/public" && ! -d "$SCAN_DIR/resources/_gen" ]] && echo "  - (nothing to remove)"
+
+  # Defensive deletes (targeted paths only)
+  rm -rf -- "$SCAN_DIR/public" "$SCAN_DIR/resources/_gen" 2>/dev/null || true
+  echo -e "${GREEN}✓ Cleanup complete${NC}"
+  return 0
+}
+
+maybe_rebuild() {
+  # Only rebuild if hugo exists and a config exists
+  if ! command -v hugo >/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠️  Rebuild requested, but 'hugo' not found in PATH. Skipping rebuild.${NC}"
+    return 0
+  fi
+  if [[ ! -f "$SCAN_DIR/hugo.toml" && ! -f "$SCAN_DIR/config.toml" && ! -f "$SCAN_DIR/config.yaml" ]]; then
+    echo -e "${YELLOW}⚠️  Rebuild requested, but no Hugo config found. Skipping rebuild.${NC}"
+    return 0
+  fi
+
+  echo -e "${BLUE}ℹ️  Rebuilding Hugo output (clean build)...${NC}"
+  (cd "$SCAN_DIR" && hugo --gc --minify) || {
+    echo -e "${YELLOW}⚠️  Hugo rebuild failed (audit will continue).${NC}"
+    return 0
+  }
+  echo -e "${GREEN}✓ Hugo rebuild complete${NC}"
+}
+
+if [[ "$DO_CLEAN" -eq 1 || "$AUTO_CLEAN" -eq 1 ]]; then
+  safe_cleanup || true
+fi
+
+if [[ "$DO_REBUILD" -eq 1 ]]; then
+  maybe_rebuild || true
+fi
+
+echo ""
 
 CRITICAL_ISSUES=0
 HIGH_ISSUES=0
@@ -622,7 +726,7 @@ if [[ $TOTAL_ISSUES -eq 0 ]]; then
     echo "  ✓ Good .gitignore coverage"
     echo "  ✓ No obvious vulnerabilities"
     echo ""
-    echo "🦛 Bob-A-Potamus Approved! Stay vigilant, stay submerged."
+    echo "🦛Oob Skulden Approved! Stay vigilant, stay submerged."
 else
     echo -e "${YELLOW}⚠️  Found $TOTAL_ISSUES total security issue(s)${NC}"
     echo ""
