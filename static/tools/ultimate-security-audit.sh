@@ -5,6 +5,12 @@
 # Enhanced with: supply chain, shortcodes, Netlify leaks, RSS/sitemap disclosure
 
 set -euo pipefail
+VERSION="0.34.0"
+
+if [[ "${1:-}" == "--version" ]]; then
+  echo "ultimate-security-audit version $VERSION"
+  exit 0
+fi
 
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
