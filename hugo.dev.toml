@@ -7,7 +7,7 @@ title = 'Oob Skulden'
 theme = 'PaperMod'
 
 relativeURLs = false
-canonifyURLs = false   # Revert to this for production
+canonifyURLs = true   # Revert to this for production
 
 [pagination]
   pagerSize = 10

@@ -104,3 +104,13 @@ hugo_stats.json
 *.backup*
 *.bak
 *~
+hugo.development.toml
+# ============================================================
+# Hugo & Netlify Local Cache (Safe to Ignore)
+# ============================================================
+
+# Hugo cache (newer Hugo versions / pipes)
+.hugo_cache/
+
+# Netlify local dev artifacts (only if using `netlify dev`)
+.netlify/
