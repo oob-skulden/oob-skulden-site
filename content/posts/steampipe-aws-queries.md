@@ -1,7 +1,7 @@
 ---
 title: "Top 10 Steampipe Queries Every AWS Team Needs"
 date: 2024-12-23
-draft: true
+draft: false
 tags: ["steampipe", "aws", "detection", "query-library"]
 categories: ["Detection"]
 author: "Oob Skulden"
