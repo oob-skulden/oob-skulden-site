@@ -10,6 +10,8 @@ No theory.
 No vendor pitches.  
 Just working solutions.
 
+*Published by **Oob Skulden***  
+
 ---
 
 ## Available Tools
