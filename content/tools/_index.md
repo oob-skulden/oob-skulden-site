@@ -7,8 +7,10 @@ draft = false
 Tools and scripts I actually use in real environments.
 
 No theory.  
-No vendor pitches.  
+No hype.  
 Just working solutions.
+
+When vendor tools appear, they’re evaluated hands-on and called out explicitly.
 
 *Published by **Oob Skulden***  
 

@@ -64,6 +64,21 @@ If you’re responsible for security *and* everything else, you’re in the righ
 
 **Current focus:** Building practical security tooling that small teams can actually implement
 
+## Site architecture (context)
+
+This site is built and published using a deliberately simple workflow:
+
+- Local development (static site generator)
+- Version control in GitHub
+- Static hosting and deployment
+
+*(Currently implemented with Hugo and Netlify.)*
+
+Most tools and checks published here were developed to support — or fix mistakes in — this workflow.  
+They are designed to remain broadly reusable and are not tied to any specific platform or vendor.
+
+As the site evolves, this architecture may change. The tooling philosophy will not.
+
 ---
 
 ## Connect
