@@ -1,11 +1,12 @@
 #!/bin/bash
 # ultimate-security-audit.sh
 # Complete security audit for Hugo sites and web projects
-# Includes: secrets, backups, exposure risks, code quality, metadata leaks
-# Enhanced with: supply chain, shortcodes, Netlify leaks, RSS/sitemap disclosure
+# Oob Skulden: The threats you don't see coming
+# Includes: secrets, backups, exposure risks, code quality, metadata leaks, supply chain
+# Enhanced with: shortcodes, Netlify leaks, RSS/sitemap disclosure, front matter secrets
 
 set -euo pipefail
-VERSION="0.34.0"
+VERSION="0.35.0"
 
 if [[ "${1:-}" == "--version" ]]; then
   echo "ultimate-security-audit version $VERSION"
@@ -20,9 +21,13 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-echo "=============================================="
-echo "🔒 ULTIMATE SECURITY AUDIT 🔒"
-echo "=============================================="
+# Oob Skulden ASCII Art
+echo ""
+echo -e "${PURPLE}╔════════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${PURPLE}║                    🦛 OOB SKULDEN 🦛                           ║${NC}"
+echo -e "${PURPLE}║              Ultimate Hugo Security Audit v$VERSION              ║${NC}"
+echo -e "${PURPLE}║          \"The threats you don't see coming\" - 95% underwater  ║${NC}"
+echo -e "${PURPLE}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
 # Check if a directory was provided
@@ -35,6 +40,7 @@ fi
 
 echo "Scanning directory: $SCAN_DIR"
 echo ""
+
 # ============================================
 # OPTIONAL: Safe cleanup of Hugo build artifacts
 # ============================================
@@ -438,17 +444,29 @@ echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 HTTP_REFS=0
+PROTO_RELATIVE=0
 if [[ -d "$SCAN_DIR/public" ]]; then
     # Look for http:// (not https://) in HTML
     HTTP_REFS=$(grep -roE 'http://[^"'\'' ]+' "$SCAN_DIR/public" 2>/dev/null | grep -v "http://www.w3.org" | wc -l || true)
+    
+    # Check for protocol-relative URLs which can cause issues
+    PROTO_RELATIVE=$(grep -roE '//[^"'\'' ]+\.(js|css|png|jpg|gif|svg|webp|woff|woff2)' "$SCAN_DIR/public" 2>/dev/null | wc -l || true)
     
     if [[ $HTTP_REFS -gt 0 ]]; then
         echo -e "${YELLOW}⚠️  Found $HTTP_REFS HTTP (non-HTTPS) reference(s) [MEDIUM]${NC}"
         grep -roE 'http://[^"'\'' ]+' "$SCAN_DIR/public" 2>/dev/null | grep -v "http://www.w3.org" | head -5 | sed 's/^/  /' || true
         echo "  Note: Can cause mixed content warnings in browsers"
         MEDIUM_ISSUES=$((MEDIUM_ISSUES + 1))
-    else
-        echo -e "${GREEN}✓ No HTTP references found (all HTTPS)${NC}"
+    fi
+    
+    if [[ $PROTO_RELATIVE -gt 0 ]]; then
+        echo -e "${BLUE}ℹ️  Found $PROTO_RELATIVE protocol-relative URL(s) (//example.com/...) [LOW]${NC}"
+        echo "  Note: Can cause issues with offline viewing or local testing"
+        LOW_ISSUES=$((LOW_ISSUES + 1))
+    fi
+    
+    if [[ $HTTP_REFS -eq 0 && $PROTO_RELATIVE -eq 0 ]]; then
+        echo -e "${GREEN}✓ No HTTP references or protocol-relative URLs found${NC}"
     fi
 fi
 echo ""
@@ -726,15 +744,34 @@ fi
 if [[ -d "$SCAN_DIR/themes" ]]; then
     THEME_COUNT=$(find "$SCAN_DIR/themes" -mindepth 1 -maxdepth 1 -type d | wc -l)
     if [[ $THEME_COUNT -gt 0 ]]; then
-        echo -e "${BLUE}ℹ️  Found $THEME_COUNT theme(s) - checking origins${NC}"
+        echo -e "${BLUE}ℹ️  Found $THEME_COUNT theme(s) - checking origins and licenses${NC}"
         
         # Check if themes are git submodules (better) or copied (worse)
         for theme_dir in "$SCAN_DIR/themes"/*; do
+            theme_name=$(basename "$theme_dir")
+            
             if [[ -d "$theme_dir/.git" ]]; then
                 REMOTE=$(cd "$theme_dir" && git remote get-url origin 2>/dev/null || echo "unknown")
-                echo -e "  ${GREEN}✓${NC} $(basename "$theme_dir"): git submodule ($REMOTE)"
+                echo -e "  ${GREEN}✓${NC} $theme_name: git submodule ($REMOTE)"
+                
+                # Check for license
+                if [[ -f "$theme_dir/LICENSE" ]] || [[ -f "$theme_dir/LICENSE.md" ]]; then
+                    LICENSE_FILE="$theme_dir/LICENSE"
+                    [[ -f "$theme_dir/LICENSE.md" ]] && LICENSE_FILE="$theme_dir/LICENSE.md"
+                    
+                    LICENSE_TYPE=$(grep -iE "(MIT|Apache|GPL|BSD)" "$LICENSE_FILE" 2>/dev/null | head -1 || echo "Unknown")
+                    
+                    if echo "$LICENSE_TYPE" | grep -qi "GPL"; then
+                        echo -e "    ${YELLOW}⚠️${NC}  GPL license detected - may require content disclosure"
+                        LOW_ISSUES=$((LOW_ISSUES + 1))
+                    else
+                        echo -e "    ${GREEN}✓${NC}  License: $LICENSE_TYPE"
+                    fi
+                else
+                    echo -e "    ${YELLOW}⚠️${NC}  No LICENSE file found"
+                fi
             else
-                echo -e "  ${YELLOW}⚠️${NC} $(basename "$theme_dir"): copied theme (no version tracking)"
+                echo -e "  ${YELLOW}⚠️${NC} $theme_name: copied theme (no version tracking)"
                 MEDIUM_ISSUES=$((MEDIUM_ISSUES + 1))
             fi
         done
@@ -850,6 +887,95 @@ fi
 echo ""
 
 # ============================================
+# CHECK 22: Front Matter Secrets [NEW]
+# ============================================
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${PURPLE}CHECK 22: Front Matter Secrets [NEW]${NC}"
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+FRONTMATTER_ISSUES=0
+if [[ -d "$SCAN_DIR/content" ]]; then
+    # Check for API keys/tokens in markdown front matter
+    FRONTMATTER_SECRETS=$(grep -rE "^(api_key|apikey|token|secret|password):\s*['\"]?[a-zA-Z0-9_-]{20,}" "$SCAN_DIR/content" --include="*.md" 2>/dev/null | wc -l || true)
+    
+    if [[ $FRONTMATTER_SECRETS -gt 0 ]]; then
+        echo -e "${RED}✗ Found $FRONTMATTER_SECRETS potential secret(s) in content front matter [CRITICAL]${NC}"
+        echo "  Common in Hugo tutorials: \"add your API key to front matter\""
+        grep -rE "^(api_key|apikey|token|secret):" "$SCAN_DIR/content" --include="*.md" 2>/dev/null | head -5 | sed 's/^/  /' || true
+        CRITICAL_ISSUES=$((CRITICAL_ISSUES + 1))
+        FRONTMATTER_ISSUES=$((FRONTMATTER_ISSUES + 1))
+    fi
+    
+    # Check for common config mistakes in front matter
+    FRONTMATTER_CONFIGS=$(grep -rE "^(baseURL|publishDir|contentDir):" "$SCAN_DIR/content" --include="*.md" 2>/dev/null | wc -l || true)
+    
+    if [[ $FRONTMATTER_CONFIGS -gt 0 ]]; then
+        echo -e "${YELLOW}⚠️  Found $FRONTMATTER_CONFIGS Hugo config parameter(s) in front matter [MEDIUM]${NC}"
+        echo "  These should be in hugo.toml, not content files"
+        MEDIUM_ISSUES=$((MEDIUM_ISSUES + 1))
+        FRONTMATTER_ISSUES=$((FRONTMATTER_ISSUES + 1))
+    fi
+    
+    if [[ $FRONTMATTER_ISSUES -eq 0 ]]; then
+        echo -e "${GREEN}✓ No secrets or misconfigurations in content front matter${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️  No content/ directory found - skipping${NC}"
+fi
+echo ""
+
+# ============================================
+# CHECK 23: Git Hooks for CI/CD Secrets [NEW]
+# ============================================
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${PURPLE}CHECK 23: Git Hooks Pre-Commit Validation [NEW]${NC}"
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+if [[ -d "$SCAN_DIR/.git/hooks" ]]; then
+    HAS_PRECOMMIT=0
+    
+    # Check for pre-commit hook
+    if [[ -f "$SCAN_DIR/.git/hooks/pre-commit" ]]; then
+        HAS_PRECOMMIT=1
+        echo -e "${GREEN}✓ Pre-commit hook exists${NC}"
+        
+        # Check if it validates secrets
+        if grep -qiE "(secret|credential|key|token|trufflehog|gitleaks)" "$SCAN_DIR/.git/hooks/pre-commit" 2>/dev/null; then
+            echo -e "${GREEN}✓ Pre-commit hook includes secret scanning${NC}"
+        else
+            echo -e "${YELLOW}⚠️  Pre-commit hook exists but doesn't validate secrets [LOW]${NC}"
+            echo "  Consider: Adding TruffleHog or gitleaks to pre-commit"
+            LOW_ISSUES=$((LOW_ISSUES + 1))
+        fi
+    fi
+    
+    # Check for pre-commit framework config
+    if [[ -f "$SCAN_DIR/.pre-commit-config.yaml" ]]; then
+        echo -e "${GREEN}✓ Pre-commit framework config found${NC}"
+        
+        # Check for security hooks
+        if grep -qiE "(trufflehog|gitleaks|detect-secrets|secret)" "$SCAN_DIR/.pre-commit-config.yaml" 2>/dev/null; then
+            echo -e "${GREEN}✓ Pre-commit config includes security checks${NC}"
+        else
+            echo -e "${YELLOW}⚠️  Pre-commit config doesn't include secret scanning [LOW]${NC}"
+            LOW_ISSUES=$((LOW_ISSUES + 1))
+        fi
+    fi
+    
+    if [[ $HAS_PRECOMMIT -eq 0 && ! -f "$SCAN_DIR/.pre-commit-config.yaml" ]]; then
+        echo -e "${YELLOW}⚠️  No pre-commit hooks configured [MEDIUM]${NC}"
+        echo "  Secrets could be committed without validation"
+        echo "  Consider: Installing pre-commit framework with secret detection"
+        MEDIUM_ISSUES=$((MEDIUM_ISSUES + 1))
+    fi
+else
+    echo -e "${YELLOW}⚠️  No .git/hooks directory found${NC}"
+fi
+echo ""
+
+# ============================================
 # FINAL SUMMARY
 # ============================================
 echo "=============================================="
@@ -892,8 +1018,10 @@ if [[ $TOTAL_ISSUES -eq 0 ]]; then
     echo "  ✓ No shortcode injection risks"
     echo "  ✓ Netlify build security confirmed"
     echo "  ✓ RSS/sitemap properly configured"
+    echo "  ✓ No front matter secrets"
+    echo "  ✓ Pre-commit hooks configured (if applicable)"
     echo ""
-    echo "🦛 Bob-A-Potamus Approved! Stay vigilant, stay submerged."
+    echo -e "${PURPLE}🦛 Oob Skulden Approved! Stay vigilant, stay submerged.${NC}"
 else
     echo -e "${YELLOW}⚠️  Found $TOTAL_ISSUES total security issue(s)${NC}"
     echo ""
@@ -905,6 +1033,9 @@ else
 fi
 
 echo ""
+echo "=============================================="
+echo -e "${PURPLE}Generated by Oob Skulden Security Audit${NC}"
+echo -e "${PURPLE}\"The threats you don't see coming\"${NC}"
 echo "=============================================="
 echo ""
 
