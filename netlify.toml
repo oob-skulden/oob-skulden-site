@@ -1,10 +1,45 @@
 [build]
-  command = "hugo"
+  command = "hugo --gc --minify"
   publish = "public"
 
 [build.environment]
   HUGO_VERSION = "0.153.2"
+  HUGO_ENV = "production"
 
+# ----------------------------
+# Canonical URL / SEO redirects
+# ----------------------------
+
+# Force HTTP -> HTTPS (canonical scheme)
+[[redirects]]
+  from = "http://oobskulden.com/*"
+  to = "https://oobskulden.com/:splat"
+  status = 301
+  force = true
+
+# Force www -> apex (canonical host)
+[[redirects]]
+  from = "https://www.oobskulden.com/*"
+  to = "https://oobskulden.com/:splat"
+  status = 301
+  force = true
+
+# If you ever had traffic to the old hyphen domain, canonicalize it too
+[[redirects]]
+  from = "https://oob-skulden.com/*"
+  to = "https://oobskulden.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "http://oob-skulden.com/*"
+  to = "https://oobskulden.com/:splat"
+  status = 301
+  force = true
+
+# ----------------------------
+# Security headers
+# ----------------------------
 [[headers]]
   for = "/*"
   [headers.values]

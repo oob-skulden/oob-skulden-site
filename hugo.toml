@@ -1,124 +1,77 @@
-baseURL = "https://oobskulden.com"               # Custom domain with HTTPS
+baseURL = "https://oobskulden.com/"
+languageCode = "en-us"
+title = "Oob Skulden"
+theme = "PaperMod"
 
-languageCode = 'en-us'
-title = 'Oob Skulden'
-theme = 'PaperMod'
-
+# URL behavior
 relativeURLs = false
-canonifyURLs = false   # Revert to this for production
+canonifyURLs = false
+
+# SEO basics
+enableRobotsTXT = true
+
+[sitemap]
+changefreq = "weekly"
+priority = 0.5
+filename = "sitemap.xml"
 
 [pagination]
-  pagerSize = 10
+pagerSize = 10
 
 [taxonomies]
-  tag = "tags"
-  category = "categories"
+tag = "tags"
+category = "categories"
+
+# Posts will be like: /2024/12/my-post-title/
+# The list page is still /posts/
+[permalinks]
+posts = "/:year/:month/:title/"
 
 [params]
-  description = "Practical cloud security guidance for teams with limited budgets"
-  author = "Oob Skulden"
-  ShowReadingTime = true
-  ShowShareButtons = true
-  ShowPostNavLinks = true
-  ShowBreadCrumbs = true
-  ShowCodeCopyButtons = true
-  ShowRssButtonInSectionTermList = true
-  defaultTheme = "auto"
-  ShowSearchPage = true
-  env = "development"
+# PaperMod uses this; keep production in Netlify
+env = "production"
 
-  # Profile mode - shows intro AND posts
-  [params.profileMode]
-    enabled = true
-    title = "Security Without the Enterprise Budget"
-    subtitle = """
-Practical cloud security for small teams. Open source tools. Free tier architectures.
-Real detection queries. Actual remediation code.
+description = "Practical cloud security guidance for teams with limited budgets"
+author = "Oob Skulden"
+
+ShowReadingTime = true
+ShowShareButtons = true
+ShowPostNavLinks = true
+ShowBreadCrumbs = true
+ShowCodeCopyButtons = true
+ShowRssButtonInSectionTermList = true
+
+defaultTheme = "auto"
+ShowSearchPage = true
+
+[params.profileMode]
+enabled = true
+title = "Security Without the Enterprise Budget"
+subtitle = """
+Practical cloud security for small teams.
+Open source tools. Free tier architectures. Real detection queries. Actual remediation code.
 
 **No theory. No vendor pitches. Just working solutions.**
-    """
-    
-    [[params.profileMode.buttons]]
-      name = "Articles"
-      url = "/posts"
-    [[params.profileMode.buttons]]
-      name = "Tools"
-      url = "/tools"
-    [[params.profileMode.buttons]]
-      name = "About"
-      url = "/about"
+"""
 
-  # All social media accounts
-  [[params.socialIcons]]
-    name = "github"
-    url = "https://github.com/oob-skulden/oob-skulden-site"
-  
-  [[params.socialIcons]]
-    name = "linkedin"
-    url = "https://www.linkedin.com/in/stonepedal/"
-  
-  [[params.socialIcons]]
-    name = "reddit"
-    url = "https://www.reddit.com/user/oobskulden/"
-  
-  [[params.socialIcons]]
-    name = "x"
-    url = "https://x.com/oobskulden"
-  
-  [[params.socialIcons]]
-    name = "rss"
-    url = "/index.xml"
+[[params.profileMode.buttons]]
+name = "Articles"
+url = "/posts/"
 
-[menu]
-  [[menu.main]]
-    identifier = "posts"
-    name = "Articles"
-    url = "/posts/"
-    weight = 10
+[[params.profileMode.buttons]]
+name = "Tools"
+url = "/tools/"
 
-  [[menu.main]]
-    identifier = "tools"
-    name = "Tools"
-    url = "/tools/"
-    weight = 20
-  
-  [[menu.main]]
-    identifier = "tags"
-    name = "Tags"
-    url = "/tags/"
-    weight = 30
+[[params.profileMode.buttons]]
+name = "About"
+url = "/about/"
 
-  [[menu.main]]
-    identifier = "about"
-    name = "About"
-    url = "/about/"
-    weight = 40
-  
-  [[menu.main]]
-    identifier = "search"
-    name = "Search"
-    url = "/search/"
-    weight = 50
-
-[outputs]
-  home = ["HTML", "RSS", "JSON"]
-
-[markup]
-  [markup.highlight]
-    style = "monokai"
-    lineNos = true
-    lineNumbersInTable = true
-    noClasses = false
-  
-  [markup.goldmark]
-    [markup.goldmark.renderer]
-      unsafe = true
-
-[permalinks]
-  posts = "/:year/:month/:title/"
 [params.label]
-  text = "Oob Skulden"
-  subtitle = """Security patterns, failures, and fixes — from the trenches."""
-  icon = "/images/oob.png"
-  iconHeight = 60
+text = "Oob Skulden"
+subtitle = "Security patterns, failures, and fixes — from the trenches."
+icon = "/images/oob.png"
+iconHeight = 60
 
+[[params.socialIcons]]
+name = "github"
+url = "https://github.com/oob-skulden/oob-skulden-site"
