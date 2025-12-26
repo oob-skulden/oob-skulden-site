@@ -1,4 +1,4 @@
 ---
 title: "Posts"
-description: "All posts"
+description: "Field notes, detections, and practical cloud security write-ups."
 ---
