@@ -1,5 +1,22 @@
 .footer-trademark {
-  font-size: 0.85rem;
-  opacity: 0.7;
-  margin-top: 0.5rem;
+    text-align: center;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.footer-trademark p {
+    margin: 0.25rem 0;
+    font-size: 0.9rem;
+    color: var(--secondary);
+}
+
+.footer-trademark .legal {
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.footer-trademark strong {
+    font-weight: 600;
+    color: var(--primary);
 }

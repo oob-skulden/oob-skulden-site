@@ -1,13 +1,19 @@
 # ============================================
 # Hugo Build Artifacts
 # ============================================
-# NOTE: /public/ is commented out because you use pre-build workflow
-# Uncomment if you switch to Netlify-builds workflow
-# /public/
-/resources/
+# NOTE: /public/ is intentionally ignored because Netlify builds from source
 /public/
+/resources/
 /resources/_gen/
 /.hugo_build.lock
+
+# ============================================
+# Local Operational / Server Scripts
+# ============================================
+# Host-specific startup or service scripts (DO NOT COMMIT)
+start-server.sh
+*-server.sh
+local-*.sh
 
 # ============================================
 # Backup Files
@@ -29,7 +35,7 @@
 *.7z
 
 # ============================================
-# Editor/IDE Files
+# Editor / IDE Files
 # ============================================
 # VSCode
 .vscode/
@@ -95,24 +101,13 @@ yarn-error.log*
 node_modules/
 
 # ============================================
-# Temporary Hugo Files
+# Temporary Hugo / Netlify Files
 # ============================================
 hugo_stats.json
-*.backup*
-*.bak
-*~
-*.backup*
-*.bak
-*~
 hugo.development.toml
-# ============================================================
-# Hugo & Netlify Local Cache (Safe to Ignore)
-# ============================================================
 
 # Hugo cache (newer Hugo versions / pipes)
 .hugo_cache/
 
 # Netlify local dev artifacts (only if using `netlify dev`)
 .netlify/
-.hugo_build.lock
-.hugo_build.lock
