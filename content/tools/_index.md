@@ -16,8 +16,6 @@ When vendor tools appear, they’re evaluated hands-on and called out explicitly
 
 ---
 
-## Available Tools
-
-- **[Zimara - Pre-push security sweep](https://github.com/oob-skulden/zimara)**  
-  Pre-push security sweep for Hugo sites and web projects  
+**[Zimara – Local security checks before you push](https://github.com/oob-skulden/zimara)**  
+  Catches secrets, private keys, risky files, and accidental exposures in your repo *before* they hit GitHub or production.  
   → [Download script](https://github.com/oob-skulden/Rivus/blob/main/zimara.sh)
