@@ -217,7 +217,7 @@ The obvious one. Scan config files for API keys, access tokens, passwords. The p
 
 ```bash
 "['\"]?api[_-]?key['\"]?\s*=\s*['\"][^'\"]+['\"]"
-"AKIA[0-9A-Z]{16}"  # AWS keys
+"AKIA[0-9A-Z]{16}"  # AWS keys (pattern example)
 "xox[baprs]-[a-zA-Z0-9-]+"  # Slack tokens
 "-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----"
 ```
