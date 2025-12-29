@@ -281,7 +281,7 @@ Example (abbreviated and redacted):
 ```text
 ╔════════════════════════════════════════════════════════════════╗
 ║              🦛 Published by Oob Skulden™ 🦛                   ║
-║        Ultimate Security Audit (Web/Static) v0.36.9            ║
+║        Ultimate Security Audit (Web/Static) v0.38.0            ║
 ║          "The threats you don't see coming" - 95% underwater   ║
 ╚════════════════════════════════════════════════════════════════╝
 

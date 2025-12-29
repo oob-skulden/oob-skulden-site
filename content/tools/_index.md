@@ -18,6 +18,6 @@ When vendor tools appear, they’re evaluated hands-on and called out explicitly
 
 ## Available Tools
 
-- **[Ultimate Security Audit](/tools/ultimate-security-audit/)**  
+- **[Rivus - Pre-push security sweep](https://github.com/oob-skulden/zimara)**  
   Pre-push security sweep for Hugo sites and web projects  
-  → [Download script](/tools/ultimate-security-audit.sh)
+  → [Download script](https://github.com/oob-skulden/Rivus/blob/main/zimara.sh)
