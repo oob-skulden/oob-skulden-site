@@ -18,6 +18,6 @@ When vendor tools appear, they’re evaluated hands-on and called out explicitly
 
 ## Available Tools
 
-- **[Rivus - Pre-push security sweep](https://github.com/oob-skulden/zimara)**  
+- **[Zimara - Pre-push security sweep](https://github.com/oob-skulden/zimara)**  
   Pre-push security sweep for Hugo sites and web projects  
   → [Download script](https://github.com/oob-skulden/Rivus/blob/main/zimara.sh)
