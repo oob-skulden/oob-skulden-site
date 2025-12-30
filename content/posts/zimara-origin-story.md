@@ -2,7 +2,7 @@
 
 ---
 title: "How I Built a Pre-Commit Security Audit on a Flight to Houston (Because I'm Cheap and Paranoid)"
-date: 2024-12-29T02:00:00-06:00
+date: 2025-12-29T02:00:00-06:00
 draft: false
 tags: ["security-tools", "static-sites", "bash", "hugo", "jekyll", "git-hooks", "devops", "pre-commit", "tool-development", "origin-story"]
 categories: ["Security", "Tools"]
@@ -45,7 +45,7 @@ But unlike most people who have that realization and do nothing, I was stuck on 
 
 ## Christmas Eve, MSP to HOU, Seat 17A
 
-**Wednesday, December 24th, 2024. 2:47 PM.**
+**Wednesday, December 24th, 2025. 2:47 PM.**
 
 I’m on a flight from Minneapolis to Houston with my wife and two daughters. Christmas Eve. Family visit. I’m on PTO. Explicitly *not* working.
 
@@ -191,7 +191,7 @@ Bash checked every box.
 
 **Bash is finicky.** Spaces matter. Quotes matter. Everything matters in ways that feel personally vindictive.
 
-**Bash is not “modern.”** You will not get upvotes on Hacker News for writing bash in 2024.
+**Bash is not “modern.”** You will not get upvotes on Hacker News for writing bash in 2025.
 
 But you know what bash is?
 
@@ -455,7 +455,7 @@ The execution safety stuff was critical—I didn’t want my security tool to be
 - **Stopped at 2 AM December 29th**
 - **Final count: 45 checks, 2,000+ lines**
 - **Runtime: 3-5 seconds depending on repo size**
-- **Tester count: One guy at his in-laws**
+- **Tester count: One guy at his parents house**
 
 -----
 
@@ -482,7 +482,7 @@ They thought that was hilarious. They’re not wrong.
 
 And then, at 0200 on Monday, December 29th, while everyone slept, I had something that actually felt… complete.
 
-Built in five days. Tested by one person (me). On vacation. At the in-laws.
+Built in five days. Tested by one person (me). On vacation. At the parents house.
 
 As one does.
 
