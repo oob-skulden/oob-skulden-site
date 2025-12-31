@@ -77,9 +77,6 @@ iconHeight = 60
 name = "github"
 url = "https://github.com/oob-skulden/oob-skulden-site"
 
-[[params.socialIcons]]
-name = "linkedin"
-url = "https://www.linkedin.com/in/stonepedal/"
 
 [[params.socialIcons]]
 name = "reddit"
