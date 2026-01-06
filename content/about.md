@@ -6,96 +6,100 @@ showToc: false
 hidemeta: true
 ---
 
-# The Mission
+## The Mission
 
-Enterprise-grade security shouldn't require enterprise budgets. This site demonstrates how small teams can implement robust cloud security using:
+Enterprise-grade security shouldn’t require enterprise budgets.
 
-- **Open source detection tools** (Steampipe, TruffleHog, Checkov)
-- **Cloud provider free tiers** (AWS, GCP, Azure)
-- **Automation that actually works**
-- **Compliance mapping that auditors accept**
+This site focuses on **practical cloud security for small teams** — the kind of security that works when you’re responsible for *everything*, not just one slice of the stack.
+
+The goal is simple: make modern security achievable without excess tooling, process theater, or unrealistic assumptions.
+
+---
 
 ## Who This Is For
 
-- Security engineers at companies with 1-5 person security teams
-- DevSecOps practitioners drowning in SaaS sprawl
-- CISOs who need to justify security investments
-- Anyone tired of "best practices" that cost $50K+/year
+- Security engineers on small or understaffed teams  
+- DevSecOps practitioners dealing with SaaS sprawl  
+- CISOs who need defensible, cost-aware decisions  
+- Anyone tired of “best practices” that assume unlimited budget and time  
 
-## What You'll Find Here
+---
 
-Every article includes:
+## What You’ll Find Here
 
-✅ **Working detection queries** you can copy-paste  
-✅ **Complete remediation pipelines** with code  
-✅ **Honest tool comparisons** (including limitations)  
-✅ **Compliance mappings** (NIST, SOC 2, PCI-DSS)  
-✅ **Free tier architecture** designs
+Every article emphasizes:
+
+- Working detection queries you can copy and adapt  
+- Complete remediation paths, not just alerts  
+- Honest tool comparisons (including limitations)  
+- Compliance mappings (NIST, SOC 2, PCI-DSS)  
+- Architectures that work on free or low-cost tiers  
+
+---
 
 ## The Approach
 
-1. **No vendor pitches** - Tools are evaluated objectively
-2. **No theory without practice** - Every recommendation is tested
-3. **No expensive solutions** - Free tier first, always
-4. **No generic advice** - Specific tools, specific commands, specific results
+1. **Vendor-agnostic analysis**  
+   Tools are evaluated based on what they do, how they fail, and how they fit into real environments.
+
+2. **No theory without practice**  
+   Every recommendation is tested in a live environment.
+
+3. **Free tier first, always**  
+   Cost is treated as a design constraint, not an afterthought.
+
+4. **No generic advice**  
+   Specific tools, specific commands, specific outcomes.
+
+---
 
 ## About Oob Skulden
 
+Oob Skulden is a pseudonym.
 
-**Oob Skulden** is my pseudonym name.
+I’ve spent over **30 years building and operating systems** — from early enterprise environments to modern cloud platforms — with the last **15+ years focused on security** as something that has to function under real-world constraints.
 
-I’ve spent **over 30 years** building and operating systems across multiple generations of technology — from early enterprise environments to modern cloud platforms. My background includes deep, hands-on work with both Windows and Linux, long before either was considered “easy.”
+Today, I work in cybersecurity at a large organization (company name intentionally redacted).  
+All views and content here are my own and are not affiliated with my employer.
 
-Over the course of my career, I’ve worked across infrastructure, networking, data, and consulting roles, and I’ve spent **the last 15+ years focused on security** — not as an abstract discipline, but as something that has to function under real-world constraints.
+---
 
-Today, I work in cybersecurity at a large organization (**company name intentionally redacted**). The views and content here are my own and are not affiliated with my employer.
+## Why This Site Exists
 
-## Why this site exists
-
-Most security guidance assumes unlimited budget, time, and specialization.
+Most security guidance assumes unlimited budget, specialization, and time.
 
 Most teams don’t have that.
 
-This site focuses on practical cloud security for small teams: concrete detection ideas, realistic remediation patterns, and attention to the overlooked parts of modern systems where risk tends to accumulate quietly.
+This site focuses on the **overlooked parts of modern systems** — where risk quietly accumulates — and shows how to address them with realistic detection and remediation strategies.
 
-If you’re responsible for security *and* everything else, you’re in the right place.
-
-**Homelab environment:** Proxmox cluster, HashiCorp Vault, multi-cloud free tier deployments
-
-**Current focus:** Building practical security tooling that small teams can actually implement
-
-## Site architecture (context)
-
-This site is built and published using a deliberately simple workflow:
-
-- Local development (static site generator)
-- Version control in GitHub
-- Static hosting and deployment
-
-*(Currently implemented with Hugo and Netlify.)*
-
-Most tools and checks published here were developed to support — or fix mistakes in — this workflow.  
-They are designed to remain broadly reusable and are not tied to any specific platform or vendor.
-
-As the site evolves, this architecture may change. The tooling philosophy will not.
+If you’re responsible for security *and everything else*, you’re in the right place.
 
 ---
 
-## Connect
+## Site Context
 
-- **[GitHub](https://github.com/oob-skulden/oob-skulden-site)** - Code, tools, and examples
-- **[LinkedIn](https://www.linkedin.com/in/stonepedal/)** - Professional updates
-- **[Reddit](https://www.reddit.com/user/oobskulden/)** - Community discussions (r/netsec, r/cybersecurity)
-- **[X/Twitter](https://x.com/oobskulden)** - Quick updates and threads
-- **[RSS Feed](/index.xml)** - Get every article in your reader
+This site is intentionally simple on the surface — but it is not just a static blog.
 
-## Discuss Articles
+Oob Skulden™ serves as a **public research interface** for ongoing work in cloud security, SaaS risk, and automation. Articles often accompany:
 
-Found something useful? Have questions? Share on:
-- **Hacker News** - Use the share button on any article
-- **Reddit** - Post to r/netsec, r/cybersecurity, r/aws
-- **LinkedIn** - Tag me in your share for discussion
+- Working tools and prototypes  
+- Homelab-backed experiments  
+- Detection logic and policy models  
+- Open-source research code  
+
+The site itself is static by design.  
+The work behind it is not.
+
+Infrastructure, tooling, and experiments evolve continuously and are validated outside the site before anything is published here.
 
 ---
 
-*All code and queries on this site are tested in my homelab before publication.*
+### Why This Matters
+
+Most security writing stops at theory.
+
+This site exists to document **systems that actually run**, including the mistakes made while building them and the lessons learned fixing them.
+
+When something appears here, it has already been tested — often broken — and rebuilt.
+---
+
