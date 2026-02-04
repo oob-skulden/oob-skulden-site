@@ -1,4 +1,58 @@
-# Deploy and Harden a Grafana + Authentik Monitoring Stack
+
+---
+title: "Zero to Production-Hardened: Grafana + Authentik + OpenBAO Monitoring Stack"
+date: 2026-02-04T18:00:00-06:00
+draft: false
+author: "Oob Skulden™"
+description: "A complete 6-phase guide to deploying and hardening a Grafana monitoring stack with Authentik SSO, OpenBAO secrets management, and HAProxy TLS termination — from first docker-compose up to audit-ready, with every security gap documented and fixed."
+tags:
+  - Security
+  - AppSec
+  - DevSecOps
+  - Monitoring
+  - Container Security
+  - Secrets Management
+  - OAuth2
+  - SSO
+  - TLS
+  - Compliance
+  - Homelab
+  - Docker
+  - Infrastructure as Code
+categories:
+  - Security
+  - Engineering
+  - Homelab
+keywords:
+  - grafana security hardening
+  - authentik oauth2 tutorial
+  - openbao secrets management
+  - production monitoring stack
+  - docker container hardening
+  - homelab security hardening
+  - grafana authentik integration
+  - tls certificate automation
+  - nist 800-53 compliance mapping
+  - soc 2 monitoring setup
+  - cis controls homelab
+  - prometheus authentication
+  - haproxy tls termination
+  - zero trust monitoring
+  - container security best practices
+  - oauth2 sso grafana
+  - session hardening grafana
+  - pki certificate management homelab
+  - open source siem stack
+  - defense in depth monitoring
+showToc: true
+tocOpen: false
+ShowReadingTime: true
+ShowBreadCrumbs: true
+ShowPostNavLinks: true
+ShowShareButtons: false
+---
+
+# Zero to Production-Hardened: Grafana + Authentik + OpenBAO Monitoring Stack
 
 **Published by Oob Skulden™**  
 *"Stay paranoid."*
