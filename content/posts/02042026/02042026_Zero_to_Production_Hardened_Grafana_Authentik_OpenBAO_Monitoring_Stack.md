@@ -1,4 +1,3 @@
-
 ---
 title: "Zero to Production-Hardened: Grafana + Authentik + OpenBAO Monitoring Stack"
 date: 2026-02-04T18:00:00-06:00
@@ -23,28 +22,28 @@ categories:
   - Security
   - Engineering
   - Homelab
-keywords:
-  - grafana security hardening
-  - authentik oauth2 tutorial
-  - openbao secrets management
-  - production monitoring stack
-  - docker container hardening
-  - homelab security hardening
-  - grafana authentik integration
-  - tls certificate automation
-  - nist 800-53 compliance mapping
-  - soc 2 monitoring setup
-  - cis controls homelab
-  - prometheus authentication
-  - haproxy tls termination
-  - zero trust monitoring
-  - container security best practices
-  - oauth2 sso grafana
-  - session hardening grafana
-  - pki certificate management homelab
-  - open source siem stack
-  - defense in depth monitoring
-showToc: true
+# keywords:
+#  - grafana security hardening
+#  - authentik oauth2 tutorial
+#  - openbao secrets management
+#  - production monitoring stack
+#  - docker container hardening
+#  - homelab security hardening
+#  - grafana authentik integration
+#  - tls certificate automation
+#  - nist 800-53 compliance mapping
+#  - soc 2 monitoring setup
+#  - cis controls homelab
+#  - prometheus authentication
+#  - haproxy tls termination
+#  - zero trust monitoring
+#  - container security best practices
+#  - oauth2 sso grafana
+#  - session hardening grafana
+#  - pki certificate management homelab
+#  - open source siem stack
+#  - defense in depth monitoring
+showToc: false
 tocOpen: false
 ShowReadingTime: true
 ShowBreadCrumbs: true
