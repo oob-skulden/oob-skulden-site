@@ -8,98 +8,81 @@ hidemeta: true
 
 ## The Mission
 
-Enterprise-grade security shouldn‚Äôt require enterprise budgets.
+Enterprise-grade security shouldn't require enterprise budgets.
 
-This site focuses on **practical cloud security for small teams** ‚Äî the kind of security that works when you‚Äôre responsible for *everything*, not just one slice of the stack.
+This site focuses on **practical security for small teams** ó the kind that works when you're responsible for *everything*, not just one slice of the stack.
 
-The goal is simple: make modern security achievable without excess tooling, process theater, or unrealistic assumptions.
+The goal: make modern security achievable without excess tooling, process theater, or unrealistic assumptions.
 
 ---
 
 ## Who This Is For
 
-- Security engineers on small or understaffed teams  
-- DevSecOps practitioners dealing with SaaS sprawl  
-- CISOs who need defensible, cost-aware decisions  
-- Anyone tired of ‚Äúbest practices‚Äù that assume unlimited budget and time  
+- Homelab builders who want to do security right from the start
+- Security engineers on small or understaffed teams
+- DevSecOps practitioners managing tool sprawl
+- Anyone tired of "best practices" that assume unlimited budget and time
 
 ---
 
-## What You‚Äôll Find Here
+## What You'll Find Here
 
 Every article emphasizes:
 
-- Working detection queries you can copy and adapt  
-- Complete remediation paths, not just alerts  
-- Honest tool comparisons (including limitations)  
-- Compliance mappings (NIST, SOC 2, PCI-DSS)  
-- Architectures that work on free or low-cost tiers  
+- Working detection queries you can copy and adapt
+- Complete remediation paths, not just alerts
+- Honest tool comparisons ó including limitations
+- Compliance mappings (NIST, SOC 2, PCI-DSS)
+- Architectures built on open-source and low-cost tools
 
 ---
 
 ## The Approach
 
-1. **Vendor-agnostic analysis**  
+1. **Vendor-agnostic analysis**
    Tools are evaluated based on what they do, how they fail, and how they fit into real environments.
 
-2. **No theory without practice**  
+2. **No theory without practice**
    Every recommendation is tested in a live environment.
 
-3. **Free tier first, always**  
+3. **Open-source first, always**
    Cost is treated as a design constraint, not an afterthought.
 
-4. **No generic advice**  
+4. **No generic advice**
    Specific tools, specific commands, specific outcomes.
 
 ---
 
-## About Oob Skulden
+## About Oob Skuldenô
 
 Oob Skulden is a pseudonym.
 
-I‚Äôve spent over **30 years building and operating systems** ‚Äî from early enterprise environments to modern cloud platforms ‚Äî with the last **15+ years focused on security** as something that has to function under real-world constraints.
+I've spent over **20 years across networking, systems administration, database engineering, and security** ó from early enterprise environments to modern infrastructure ó with the last **15+ years focused on security** under real-world constraints: limited budgets, small teams, and competing priorities.
 
-Today, I work in cybersecurity at a large organization (company name intentionally redacted).  
-All views and content here are my own and are not affiliated with my employer.
+I run an extensive homelab where every technique published here is tested first.
+
+All views and content here are my own. This site is not affiliated with, endorsed by, or representative of any employer, past or present.
 
 ---
 
 ## Why This Site Exists
 
-Most security guidance assumes unlimited budget, specialization, and time.
+Most security guidance assumes unlimited budget, specialization, and time. Most homelabs and small teams don't have that.
 
-Most teams don‚Äôt have that.
+This site focuses on the **overlooked parts of self-hosted infrastructure** ó where risk quietly accumulates ó and documents how to address them with realistic detection and remediation strategies, tested in a real homelab before they're published.
 
-This site focuses on the **overlooked parts of modern systems** ‚Äî where risk quietly accumulates ‚Äî and shows how to address them with realistic detection and remediation strategies.
+When something appears here, it has already been tested ó often broken ó and rebuilt. The articles reflect systems that actually run, including the mistakes made building them and the lessons learned fixing them.
 
-If you‚Äôre responsible for security *and everything else*, you‚Äôre in the right place.
-
----
-
-## Site Context
-
-This site is intentionally simple on the surface ‚Äî but it is not just a static blog.
-
-Oob Skulden‚Ñ¢ serves as a **public research interface** for ongoing work in cloud security, SaaS risk, and automation. Articles often accompany:
-
-- Working tools and prototypes  
-- Homelab-backed experiments  
-- Detection logic and policy models  
-- Open-source research code  
-
-The site itself is static by design.  
-The work behind it is not.
-
-Infrastructure, tooling, and experiments evolve continuously and are validated outside the site before anything is published here.
+If you're responsible for security *and everything else*, you're in the right place.
 
 ---
 
-### Why This Matters
+## Behind the Site
 
-Most security writing stops at theory.
+This site is static by design. The work behind it is not.
 
-This site exists to document **systems that actually run**, including the mistakes made while building them and the lessons learned fixing them.
+Articles are backed by homelab experiments, working tools, detection logic, and open-source research. Infrastructure and tooling evolve continuously and are validated before anything is published.
 
-When something appears here, it has already been tested ‚Äî often broken ‚Äî and rebuilt.
 ---
 
+*Oob Skuldenô is a personal educational project. Content is based on publicly available frameworks, open-source tools, and documented best practices. This site does not provide professional consulting services.*
