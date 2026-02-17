@@ -1,9 +1,9 @@
 ---
-title: "Zero to Production-Hardened: Grafana + Authentik + OpenBAO Monitoring Stack"
-date: 2026-02-04T18:00:00-06:00
+title: "Authentik + Grafana: OAuth SSO Across VLANs and the 11 Things That Broke"
+date: 2026-02-14T08:00:00-06:00
 draft: false
-author: "Oob Skulden™"
-description: "A complete 6-phase guide to deploying and hardening a Grafana monitoring stack with Authentik SSO, OpenBAO secrets management, and HAProxy TLS termination — from first docker-compose up to audit-ready, with every security gap documented and fixed."
+author: "Oob Skulden�"
+description: "A complete walkthrough of deploying Authentik as an OIDC provider for Grafana and Prometheus across a multi-VLAN lab, including every issue encountered, the diagnostic reasoning behind each fix, and the security trade-offs made along the way."
 tags:
   - Security
   - AppSec
@@ -51,230 +51,188 @@ ShowPostNavLinks: true
 ShowShareButtons: false
 ---
 
-# Zero to Production-Hardened: Grafana + Authentik + OpenBAO Monitoring Stack
-
-**Published by Oob Skulden™**  
-*"Stay paranoid."*
-
-> **Disclaimer:** This guide is independent educational content created on personal time using personal equipment in a personal homelab environment. It is not affiliated with, endorsed by, or representative of any employer or organization. All tools demonstrated are open-source and publicly available. All compliance references cite publicly published frameworks. Readers are solely responsible for ensuring they have proper authorization before applying any techniques described here to systems they access or manage.
+*The views and opinions expressed on this site are my own and do not reflect the views of my employer. This content is based entirely on publicly available documentation for open-source tools and does not contain proprietary information from any current or former employer.*
 
 ---
 
-## Why This Guide Exists
-
-Most Grafana deployment guides end the moment the login page loads. "It works!" and they move on.
-
-That's where the problems start.
-
-I built this monitoring stack in my homelab, got everything running, and then started asking the uncomfortable questions. What happens when I disable a user in Authentik? Does their Grafana session actually die? (Spoiler: it didn't. It survived for days.) What can someone see if they hit Prometheus directly? (Everything. Every host, every service, every version number, completely unauthenticated.) Where's the OAuth client secret? (Sitting in plaintext inside the container, one `docker inspect` away.)
-
-The deployment took a couple hours. Fixing all of that took a few more.
-
-This guide covers the entire journey — from first `docker-compose up` to a stack you'd actually feel okay putting in front of an auditor. Every mistake I made is documented, every dead end is explained, and every fix includes the "why" alongside the "how."
-
-## What You're Building
-
-The stack runs across three VMs on separate VLANs: Grafana and Prometheus for monitoring, Authentik for identity and SSO, and OpenBAO for secrets management and PKI. HAProxy sits in front of Grafana handling TLS termination, security headers, and rate limiting.
-
-By the end, you'll have OAuth2 SSO with group-based role mapping, TLS everywhere with automated certificate renewal, secrets pulled dynamically from OpenBAO at container startup (nothing hardcoded), containers locked down to four Linux capabilities, aggressive session timeouts, audit logging, and the whole thing mapped to NIST 800-53, SOC 2, and CIS Controls because compliance people like tables.
-
-**Total time:** Around 5-8 hours (2-3h deployment, 3-5h hardening).  
-**Environment:** Multi-VLAN homelab on Debian 13, Proxmox VE 8.x.
+> **Intentionally Insecure Lab Environment**
+>
+> This deployment is deliberately configured without TLS, reverse proxies, or secrets management. It exists to expose and document the full attack surface of a vanilla monitoring stack so that hardening decisions in later phases are informed, not assumed.
+>
+> **Do not replicate this configuration in production or on any network exposed to untrusted traffic.** The hardening series that follows this post addresses every exposure documented here.
 
 ---
 
-## Table of Contents
+## The Setup Nobody Documents Properly
 
-### Part 1: Initial Deployment (Baseline Functional)
+You want centralized authentication for your monitoring stack. Reasonable ask. You pick Authentik because it's open-source, self-hosted, and supports OAuth2/OIDC natively. You pick Grafana because it's Grafana. You figure: two well-documented projects, one standardized protocol, a couple hours tops.
 
-1. [Infrastructure Prerequisites](#infrastructure-prerequisites)
-2. [Deploy Authentik](#deploy-authentik)
-3. [Deploy OpenBAO](#deploy-openbao)
-4. [Deploy Grafana Stack](#deploy-grafana-stack)
-5. [Configure OAuth Integration](#configure-oauth)
-6. [Initial Validation](#initial-validation)
+It took considerably longer than that. Not because the tools are bad, but because OAuth integration across network segments has a dozen failure modes, and the error messages for most of them are identical. "Failed to get token from provider" could mean five different things.
 
-### Part 2: Security Hardening (Baseline → Production-Hardened)
+This post documents the full deployment of an OAuth-authenticated monitoring stack using Authentik 2025.12.3 as the identity provider and Grafana as the frontend, connected via OIDC across a multi-VLAN lab environment. More importantly, it documents the 11 things that broke, how each was diagnosed, and what the actual fix was.
 
-7. [Phase 1: Session Hardening](#phase-1-sessions)
-8. [Phase 2: TLS Encryption](#phase-2-tls)
-9. [Phase 3: Prometheus Authentication](#phase-3-prometheus)
-10. [Phase 4: Secrets Management](#phase-4-secrets)
-11. [Phase 5: Container Hardening](#phase-5-containers)
-12. [Phase 6: Production Readiness](#phase-6-production)
-
-### Part 3: Operations
-
-13. [Final Security Posture](#final-posture)
-14. [Deployment Checklist](#deployment-checklist)
-15. [Maintenance Procedures](#maintenance)
-16. [Troubleshooting Guide](#troubleshooting)
+One deliberate choice up front: this is a vanilla, unsecured deployment. No TLS. No reverse proxy. No secret injection. That's on purpose. If you jump straight to HTTPS and certificate automation, you close off your ability to see what the actual attack surface looks like. You can't defend what you haven't observed. This deployment is about understanding every exposed port, every plaintext credential path, every trust boundary -- so that when we harden it in later phases, we're making informed decisions instead of just ticking boxes.
 
 ---
 
-## Part 1: Initial Deployment
+## Architecture
 
-<a name="infrastructure-prerequisites"></a>
-## 1. Infrastructure Prerequisites
+Two hosts on separate VLANs, talking to each other over routed subnets. Both are Debian 13 (Trixie), 2 cores, 4 GB RAM, 20 GB disk. Nothing exotic -- this runs on whatever spare hardware you have lying around.
 
-### Hardware Requirements
+| Host | IP | VLAN | Role |
+|---|---|---|---|
+| Authentik-lab | 192.168.80.54 | VLAN 80 | Identity Provider |
+| Grafana-lab | 192.168.75.109 | VLAN 75 | Monitoring Stack |
 
-**Three Virtual Machines (Proxmox VE 8.x):**
+Authentik-lab runs three containers: the Authentik server (ports 9000/9443), a background worker, and PostgreSQL 16. No Redis -- Authentik 2025.12 removed that dependency entirely and handles caching and task queuing through PostgreSQL.
 
-| VM | IP | VLAN | CPU | RAM | Disk | Purpose |
-|----|-----|------|-----|-----|------|---------|
-| Authentik | 10.10.80.10 | 80 | 2 vCPU | 4GB | 32GB | Identity/OAuth |
-| OpenBAO | 10.10.100.10 | 100 | 2 vCPU | 2GB | 20GB | Secrets/PKI |
-| Grafana-lab | 10.10.75.10 | 75 | 2 vCPU | 4GB | 32GB | Monitoring |
+Grafana-lab runs five containers across two Docker networks. This is where it gets interesting.
 
-### Network Architecture
+Grafana, Prometheus, and Blackbox Exporter share `grafana_network`. Node Exporter and cAdvisor live on a separate `prometheus_network`. Prometheus bridges both because it's the collector -- it needs to reach every exporter. But Grafana doesn't need direct access to Node Exporter or cAdvisor. Separating them limits lateral movement if any single container is compromised. That's a smaller trust boundary than putting everything on one flat network, and it costs you nothing to set up.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ VLAN 75: Monitoring Network (10.10.75.0/24)              │
-│  Grafana-lab (10.10.75.10)                                │
-│  ├── Grafana:3000                                           │
-│  ├── Prometheus:9090                                        │
-│  ├── Blackbox Exporter:9115                                 │
-│  ├── Node Exporter:9100                                     │
-│  └── cAdvisor:8080                                          │
-└──────────────────┬──────────────────────────────────────────┘
-                   │
-                   │ OAuth2/OIDC Flow
-                   ▼
-┌─────────────────────────────────────────────────────────────┐
-│ VLAN 80: Identity & Access (10.10.80.0/24)               │
-│  Authentik (10.10.80.10)                                  │
-│  ├── Authentik Server:9000                                  │
-│  ├── PostgreSQL:5432 (internal)                             │
-│  └── Redis:6379 (internal)                                  │
-└──────────────────┬──────────────────────────────────────────┘
-                   │
-                   │ Secrets + PKI Certificates
-                   ▼
-┌─────────────────────────────────────────────────────────────┐
-│ VLAN 100: Secrets Management (10.10.100.0/24)            │
-│  OpenBAO (10.10.100.10)                                  │
-│  ├── OpenBAO:8200                                           │
-│  ├── KV Secrets Engine v2                                   │
-│  ├── PKI Engine (internal CA)                               │
-│  └── AppRole Authentication                                 │
-└─────────────────────────────────────────────────────────────┘
+grafana_network:
+  +-- grafana           (port 3000)
+  +-- prometheus        (port 9090)
+  +-- blackbox-exporter (port 9115)
+
+prometheus_network:
+  +-- prometheus        (bridges both networks)
+  +-- node-exporter     (port 9100)
+  +-- cadvisor          (port 8080)
+
+Cross-VLAN:
+  Grafana (VLAN 75) <--OIDC--> Authentik (VLAN 80)
 ```
 
-### Software Prerequisites
+A future phase adds OpenBAO on VLAN 100 for secrets management (that's a big enough topic to get its own dedicated series) and HAProxy for TLS termination. But this deployment runs HTTP deliberately. You learn more about a system's vulnerabilities by watching it operate without guardrails than by locking everything down on day one and hoping you covered it all.
 
-**On ALL three hosts:**
+---
+
+## Software Prerequisites
+
+Same packages on both hosts. Do this before deploying anything -- chasing missing dependencies mid-setup is a waste of time you won't get back.
 
 ```bash
 # Update system
 sudo apt update && sudo apt upgrade -y
 
-# Install Docker
-sudo apt install -y docker.io docker-compose
+# Install Docker CE
+sudo apt install -y docker.io docker-compose-plugin
 
 # Start and enable Docker
 sudo systemctl enable docker
 sudo systemctl start docker
 
-# Verify installation
+# Verify Docker installation
 docker --version
-docker-compose --version
+docker compose version
+
+# Add your user to the docker group (log out and back in after)
+sudo usermod -aG docker $USER
 
 # Install utilities
-sudo apt install -y curl wget jq net-tools openssl apache2-utils
-
-# Optional: Add user to docker group
-sudo usermod -aG docker $USER
-# Log out and back in for this to take effect
+sudo apt install -y \
+  curl \
+  wget \
+  jq \
+  net-tools \
+  netcat-openbsd \
+  iptables-persistent
 ```
 
-### Firewall Configuration
-
-**If using UniFi or similar:**
-
-```
-Rule: Authentik_OAuth_Access
-  Source: 10.10.75.10 (Grafana)
-  Destination: 10.10.80.10:9000 (Authentik)
-  Protocol: TCP
-  Action: Allow
-
-Rule: OpenBAO_Secrets_Access
-  Source: 10.10.75.10 (Grafana)
-  Destination: 10.10.100.10:8200 (OpenBAO)
-  Protocol: TCP
-  Action: Allow
-
-Rule: OpenBAO_PKI_Access
-  Source: 10.10.75.10 (Grafana)
-  Destination: 10.10.100.10:8200 (OpenBAO)
-  Protocol: TCP
-  Action: Allow
-```
+The `iptables-persistent` package matters more than it looks -- it's how the firewall rules survive a reboot when we get to hardening.
 
 ---
 
-<a name="deploy-authentik"></a>
-## 2. Deploy Authentik
+## The OAuth Flow (And Why TLS Gets Weird)
 
-**On Authentik host (10.10.80.10):**
+Understanding two distinct connection types in the OAuth2/OIDC flow saves hours of debugging.
 
-### Step 1: Create Directory Structure
+First, the user's browser redirects to Authentik for login. This is a **browser-to-server** connection. If Authentik is running a self-signed cert, the user can click through the warning and move on.
+
+Second, after the user authenticates and gets redirected back with an authorization code, Grafana's backend makes a **server-to-server** HTTP call to Authentik's token endpoint to exchange that code for tokens. This call enforces strict TLS validation. No click-through option. No human in the loop.
+
+This distinction is why self-signed certs break OAuth in ways that aren't immediately obvious. The browser half works fine. The server half silently rejects the certificate. Grafana logs `x509: cannot validate certificate` and the user sees a generic "Login failed" message.
+
+The pragmatic choice for this deployment: use Authentik's HTTP endpoint (port 9000) on a private VLAN rather than HTTPS (9443) with TLS skip enabled. There's a security argument for this beyond convenience. Running plaintext forces you to confront the actual trust model of your network. `TLS_SKIP_VERIFY_INSECURE=true` gives you the warm feeling of HTTPS with none of the actual guarantees -- and worse, it trains you to stop thinking about what's on the wire. HTTP on an isolated segment is honest about its posture. TLS skip is a lie you tell yourself. When TLS gets added properly -- HAProxy with real certificates from a PKI backend -- it'll be because we understand exactly what we're encrypting and why, not because a compliance checklist said to.
+
+---
+
+## Deploying Authentik
+
+### Directory Structure
+
+**On the Authentik host (192.168.80.54):**
 
 ```bash
-mkdir -p ~/authentik/{media,certs,custom-templates}
+mkdir -p ~/authentik/{data/media,certs,custom-templates}
 cd ~/authentik
 ```
 
-### Step 2: Generate Secure Secrets
+The `data/` directory is where Authentik 2025.12 stores application data. The `certs/` and `custom-templates/` directories are empty for now but will be used when TLS and UI customization come into play.
+
+### Version-Specific Gotchas
+
+Authentik 2025.12 changed several things that will bite you if you're following older guides: Redis is gone. The volume mount path changed from `./media:/media` to `./data:/data`. And the environment variable names changed: `POSTGRES_PASSWORD` became `PG_PASS`, `POSTGRES_USER` became `PG_USER`, `POSTGRES_DB` became `PG_DB`. Use the old names and nothing connects.
+
+Always download the version-specific compose file:
 
 ```bash
-# PostgreSQL password (alphanumeric only)
-POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9')
-echo "PostgreSQL Password: $POSTGRES_PASSWORD"
-
-# Authentik secret key (alphanumeric only)
-AUTHENTIK_SECRET_KEY=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9')
-echo "Authentik Secret Key: $AUTHENTIK_SECRET_KEY"
-
-# SAVE THESE IN PASSWORD MANAGER IMMEDIATELY
+wget -O docker-compose.yml https://goauthentik.io/version/2025.12/docker-compose.yml
 ```
 
-### Step 3: Create Environment File
+### Secret Generation
+
+This is where the first issue usually appears. The `AUTHENTIK_SECRET_KEY` must be at least 50 characters or Django throws security warning W009. The problem is that `openssl rand -base64 32 | tr -dc 'a-zA-Z0-9'` strips non-alphanumeric characters, and the output is routinely 25-40% shorter than the input byte count.
 
 ```bash
-cat > .env << EOF
-# PostgreSQL Configuration
-POSTGRES_DB=authentik
-POSTGRES_USER=authentik
-POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+# Generate secrets with enough headroom
+PG_PASS=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9')
+AUTHENTIK_SECRET_KEY=$(openssl rand -base64 64 | tr -dc 'a-zA-Z0-9')
 
-# Redis Configuration
-REDIS_HOST=redis
+# ALWAYS verify the actual length after filtering
+echo -n "$AUTHENTIK_SECRET_KEY" | wc -c  # Must be 50+
+echo -n "$PG_PASS" | wc -c
+```
 
-# Authentik Configuration
-AUTHENTIK_SECRET_KEY=$AUTHENTIK_SECRET_KEY
+Using `-base64 32` for the secret key is a trap. You'll get 40-something characters and spend 15 minutes wondering why Authentik is complaining during startup.
+
+Save both secrets in a password manager immediately after generation, before doing anything else. If you lose them mid-setup, you're starting over. Use only alphanumeric characters to avoid shell parsing issues with special characters in `.env` files.
+
+Also worth knowing: the Authentik UI may truncate displayed secrets in the provider configuration page. Always generate secrets externally in the terminal and paste them in -- don't rely on Authentik's UI to show you the full value.
+
+### Environment File
+
+Nothing clever here. Credentials go in `.env`, permissions get locked down, and you move on.
+
+```bash
+# ~/authentik/.env
+PG_DB=authentik
+PG_USER=authentik
+PG_PASS=<generated-password>
+AUTHENTIK_SECRET_KEY=<generated-key-50+-chars>
 AUTHENTIK_ERROR_REPORTING__ENABLED=false
 AUTHENTIK_LOG_LEVEL=info
-AUTHENTIK_COOKIE_DOMAIN=10.10.80.10
-EOF
+AUTHENTIK_COOKIE_DOMAIN=192.168.80.54
+```
 
+```bash
 chmod 600 .env
 ```
 
-### Step 4: Create Docker Compose File
+### Authentik Docker Compose
 
-```bash
-cat > docker-compose.yml << 'EOF'
-version: '3.7'
+The 2025.12 compose file defines three services. If you downloaded the official one from `goauthentik.io`, verify it matches this structure. If you're building it by hand -- or you want to understand what you just downloaded -- here's what's inside:
 
+```yaml
 services:
   postgresql:
-    image: postgres:16-alpine
+    image: docker.io/library/postgres:16
+    container_name: authentik-postgresql
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -d $${PG_DB} -U $${PG_USER}"]
       start_period: 20s
       interval: 30s
       retries: 5
@@ -282,1847 +240,683 @@ services:
     volumes:
       - database:/var/lib/postgresql/data
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_USER: ${POSTGRES_USER:-authentik}
-      POSTGRES_DB: ${POSTGRES_DB:-authentik}
-    networks:
-      - authentik_network
-
-  redis:
-    image: redis:alpine
-    command: --save 60 1 --loglevel warning
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
-      start_period: 20s
-      interval: 30s
-      retries: 5
-      timeout: 3s
-    volumes:
-      - redis:/data
-    networks:
-      - authentik_network
+      POSTGRES_PASSWORD: ${PG_PASS}
+      POSTGRES_USER: ${PG_USER:-authentik}
+      POSTGRES_DB: ${PG_DB:-authentik}
+    env_file:
+      - .env
 
   server:
-    image: ghcr.io/goauthentik/server:latest
+    image: ghcr.io/goauthentik/server:2025.12.3
+    container_name: authentik-server
     restart: unless-stopped
     command: server
     environment:
-      AUTHENTIK_REDIS__HOST: redis
       AUTHENTIK_POSTGRESQL__HOST: postgresql
-      AUTHENTIK_POSTGRESQL__USER: ${POSTGRES_USER:-authentik}
-      AUTHENTIK_POSTGRESQL__NAME: ${POSTGRES_DB:-authentik}
-      AUTHENTIK_POSTGRESQL__PASSWORD: ${POSTGRES_PASSWORD}
-      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
-      AUTHENTIK_ERROR_REPORTING__ENABLED: ${AUTHENTIK_ERROR_REPORTING__ENABLED:-false}
-      AUTHENTIK_LOG_LEVEL: ${AUTHENTIK_LOG_LEVEL:-info}
-      AUTHENTIK_COOKIE_DOMAIN: ${AUTHENTIK_COOKIE_DOMAIN}
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
     volumes:
-      - ./media:/media
+      - ./data:/data
       - ./custom-templates:/templates
+    env_file:
+      - .env
     ports:
       - "9000:9000"
       - "9443:9443"
     depends_on:
-      - postgresql
-      - redis
-    networks:
-      - authentik_network
+      postgresql:
+        condition: service_healthy
 
   worker:
-    image: ghcr.io/goauthentik/server:latest
+    image: ghcr.io/goauthentik/server:2025.12.3
+    container_name: authentik-worker
     restart: unless-stopped
     command: worker
     environment:
-      AUTHENTIK_REDIS__HOST: redis
       AUTHENTIK_POSTGRESQL__HOST: postgresql
-      AUTHENTIK_POSTGRESQL__USER: ${POSTGRES_USER:-authentik}
-      AUTHENTIK_POSTGRESQL__NAME: ${POSTGRES_DB:-authentik}
-      AUTHENTIK_POSTGRESQL__PASSWORD: ${POSTGRES_PASSWORD}
-      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
-      AUTHENTIK_ERROR_REPORTING__ENABLED: ${AUTHENTIK_ERROR_REPORTING__ENABLED:-false}
-      AUTHENTIK_LOG_LEVEL: ${AUTHENTIK_LOG_LEVEL:-info}
-    user: root
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./media:/media
+      - ./data:/data
       - ./certs:/certs
       - ./custom-templates:/templates
+    env_file:
+      - .env
     depends_on:
-      - postgresql
-      - redis
-    networks:
-      - authentik_network
+      postgresql:
+        condition: service_healthy
 
 volumes:
   database:
-  redis:
-
-networks:
-  authentik_network:
-    driver: bridge
-EOF
+    driver: local
 ```
 
-### Step 5: Deploy Authentik
+Notice there's no Redis service. If you're following a guide that tells you to add one, that guide is outdated. Authentik 2025.12 handles caching and task queuing entirely through PostgreSQL. Redis references in your compose file or environment will either be silently ignored or actively break things.
+
+### Deploy and Bootstrap
 
 ```bash
-# Validate configuration
-docker-compose config
-
-# Start services
-docker-compose up -d
-
-# Check status
-docker-compose ps
-
-# View logs
-docker-compose logs -f
+docker compose up -d
 ```
 
-### Step 6: Create Initial Admin Account
+Give it a minute. Authentik's first startup involves database migrations, and the worker won't report healthy until they're done. Verify all three containers are running:
 
 ```bash
-# Wait for services to be healthy (30-60 seconds)
-sleep 60
+docker compose ps
 
-# Create admin user
-docker-compose exec server ak create_admin_user \
-  --username akadmin \
-  --email admin@example.com \
-  --password YourStrongPasswordHere
-
-# Verify
-docker-compose logs server | grep "Created user"
+# Expected:
+# authentik-server       running   0.0.0.0:9000->9000/tcp
+# authentik-worker       running
+# authentik-postgresql   running (healthy)
 ```
 
-### Step 7: Access Authentik Web UI
+Check the server logs for any secret key warnings:
+
+```bash
+docker compose logs server | grep -i 'secret\|error\|warning' | head -20
+```
+
+Once the containers are healthy, hit the bootstrap URL at `http://192.168.80.54:9000/if/flow/initial-setup/` to set the admin credentials.
 
 ```
-Browser: http://10.10.80.10:9000
+Email: admin@lab.local
 Username: akadmin
-Password: YourStrongPasswordHere
+Password: [set a strong password -- save in password manager immediately]
 ```
 
-**Initial setup wizard:**
-1. Set display name
-2. Configure default tenant
-3. Skip email for now (configure later)
-4. Complete setup
+This page only works against a fresh database. If you see "Flow does not apply to current user," an admin already exists from a previous run. The fix is `docker compose down -v` to nuke the volumes, then `docker compose up -d`, then use an incognito window because stale session cookies will also cause this error.
+
+### Verify Authentik Health
+
+Trust but verify. Containers showing "Up" in `docker compose ps` doesn't mean the application is actually working. Check that the database is reachable and the server is processing requests:
+
+```bash
+# Check PostgreSQL connectivity
+docker exec -it authentik-postgresql psql -U authentik -d authentik -c "\dt" | head -5
+
+# Follow server logs
+docker compose logs -f server
+# Wait for the "Starting authentik server" message
+
+# Check worker logs
+docker compose logs worker | tail -20
+```
+
+If everything looks clean, access the admin interface at `http://192.168.80.54:9000` and log in with the `akadmin` credentials you just set. If it loads and you can navigate, Authentik is ready for the next step.
+
+### Password Reset (If Needed)
+
+If you lose the admin password:
+
+```bash
+# Reset password (ONE WORD -- this is a common gotcha)
+docker exec -it authentik-server ak changepassword akadmin
+
+# Common mistakes:
+# ak change_password akadmin   <-- wrong (underscore)
+# ak reset-password akadmin    <-- wrong (hyphen)
+# ak changepassword akadmin    <-- correct
+```
 
 ---
 
-<a name="deploy-openbao"></a>
-## 3. Deploy OpenBAO
+## Deploying the Monitoring Stack
 
-**On OpenBAO host (10.10.100.10):**
+### Create Docker Networks and Volumes
 
-### Step 1: Create Directory Structure
+**On the Grafana host (192.168.75.109):**
+
+Create the networks and volumes before deploying anything. Docker Compose can create these automatically, but that's a trap -- `docker compose down -v` will cheerfully destroy them along with everything inside. Creating them manually and marking them `external` in the compose file means your Grafana dashboards and Prometheus history survive a bad day.
 
 ```bash
-mkdir -p ~/openbao/{config,data,logs}
-cd ~/openbao
+# Create Docker networks
+docker network create grafana_network
+docker network create prometheus_network
+
+# Verify networks
+docker network ls | grep -E 'grafana|prometheus'
+
+# Create persistent volumes
+docker volume create grafana-data
+docker volume create prometheus-data
+docker volume create prometheus-config
+
+# Verify volumes
+docker volume ls | grep -E 'grafana|prometheus'
 ```
 
-### Step 2: Create OpenBAO Configuration
+### Directory Structure
 
 ```bash
-cat > config/openbao.hcl << 'EOF'
-# Published by Oob Skulden™
-
-storage "file" {
-  path = "/openbao/data"
-}
-
-listener "tcp" {
-  address     = "0.0.0.0:8200"
-  tls_disable = 1
-}
-
-api_addr = "http://10.10.100.10:8200"
-ui = true
-EOF
-```
-
-### Step 3: Create Docker Compose File
-
-```bash
-cat > docker-compose.yml << 'EOF'
-version: '3.8'
-
-services:
-  openbao:
-    image: openbao/openbao:latest
-    container_name: openbao
-    restart: unless-stopped
-    ports:
-      - "8200:8200"
-    volumes:
-      - ./config:/openbao/config:ro
-      - ./data:/openbao/data
-      - ./logs:/openbao/logs
-    cap_add:
-      - IPC_LOCK
-    command: server
-    environment:
-      - BAO_ADDR=http://0.0.0.0:8200
-    networks:
-      - openbao_network
-
-networks:
-  openbao_network:
-    driver: bridge
-EOF
-```
-
-### Step 4: Deploy OpenBAO
-
-```bash
-# Start container
-docker-compose up -d
-
-# Verify running
-docker-compose ps
-
-# View logs
-docker-compose logs -f openbao
-```
-
-### Step 5: Initialize OpenBAO
-
-```bash
-# Access container
-docker exec -it openbao sh
-
-# Set environment
-export BAO_ADDR='http://127.0.0.1:8200'
-
-# Initialize (save output!)
-bao operator init
-
-# Output will look like:
-# Unseal Key 1: base64encodedkey1
-# Unseal Key 2: base64encodedkey2
-# Unseal Key 3: base64encodedkey3
-# Unseal Key 4: base64encodedkey4
-# Unseal Key 5: base64encodedkey5
-# 
-# Initial Root Token: s.YourRootTokenHere
-
-# CRITICAL: Save these immediately in password manager!
-```
-
-### Step 6: Unseal OpenBAO
-
-```bash
-# Still in container shell
-# Unseal with 3 of 5 keys (default threshold)
-
-bao operator unseal [Unseal Key 1]
-bao operator unseal [Unseal Key 2]
-bao operator unseal [Unseal Key 3]
-
-# Verify unsealed
-bao status
-# Sealed: false ✓
-```
-
-### Step 7: Enable Secrets Engines
-
-```bash
-# Login with root token
-bao login s.YourRootTokenHere
-
-# Enable KV v2 secrets engine
-bao secrets enable -version=2 -path=secret kv
-
-# Enable PKI engine
-bao secrets enable pki
-
-# Configure PKI
-bao secrets tune -max-lease-ttl=87600h pki
-
-# Generate root CA
-bao write -field=certificate pki/root/generate/internal \
-  common_name="OpenBAO Root CA" \
-  ttl=87600h > /tmp/ca_cert.crt
-
-# Configure URLs
-bao write pki/config/urls \
-  issuing_certificates="http://10.10.100.10:8200/v1/pki/ca" \
-  crl_distribution_points="http://10.10.100.10:8200/v1/pki/crl"
-
-# Create role for Grafana certificates
-bao write pki/roles/grafana-server \
-  allowed_domains="10.10.75.10" \
-  allow_bare_domains=true \
-  allow_ip_sans=true \
-  max_ttl=720h \
-  require_cn=false
-
-# Test certificate issuance
-bao write pki/issue/grafana-server \
-  common_name="10.10.75.10" \
-  ip_sans="10.10.75.10" \
-  ttl="720h"
-```
-
-### Step 8: Enable AppRole Authentication
-
-```bash
-# Still logged in as root
-
-# Enable AppRole auth method
-bao auth enable approle
-
-# Create policy for Grafana secrets
-cat > /tmp/grafana-policy.hcl << 'POLICY'
-path "secret/data/grafana/*" {
-  capabilities = ["read"]
-}
-
-path "secret/metadata/grafana/*" {
-  capabilities = ["read", "list"]
-}
-POLICY
-
-bao policy write grafana-policy /tmp/grafana-policy.hcl
-
-# Create AppRole
-bao write auth/approle/role/grafana \
-  token_policies="grafana-policy" \
-  token_ttl=1h \
-  token_max_ttl=4h \
-  secret_id_ttl=0 \
-  secret_id_num_uses=0
-
-# Get role_id (save this)
-bao read auth/approle/role/grafana/role-id
-# role_id: <your-grafana-role-id>
-
-# Generate secret_id (save this)
-bao write -f auth/approle/role/grafana/secret-id
-# secret_id: <your-grafana-secret-id>
-
-# Exit container
-exit
-```
-
-**Save these credentials securely - you'll need them for Grafana deployment.**
-
----
-
-<a name="deploy-grafana-stack"></a>
-## 4. Deploy Grafana Stack
-
-**On Grafana-lab host (10.10.75.10):**
-
-### Step 1: Create Directory Structure
-
-```bash
-mkdir -p ~/monitoring/{grafana,prometheus}
+mkdir -p ~/monitoring/{prometheus,grafana}
 cd ~/monitoring
 ```
 
-### Step 2: Create Grafana Entrypoint Script
+### Prometheus Configuration
 
-This script retrieves the OAuth secret from OpenBAO at container startup:
-
-```bash
-cat > grafana/entrypoint.sh << 'EOF'
-#!/usr/bin/with-contenv bash
-# Grafana Dynamic Secret Injection
-# Published by Oob Skulden™
-
-set -e
-
-# AppRole credentials from environment
-ROLE_ID="${BAO_ROLE_ID}"
-SECRET_ID="${BAO_SECRET_ID}"
-BAO_ADDR="http://10.10.100.10:8200"
-
-echo "=== Retrieving OAuth secret from OpenBAO ==="
-
-# Authenticate with AppRole
-TOKEN_JSON=$(curl -s -X POST \
-  -d "{\"role_id\":\"${ROLE_ID}\",\"secret_id\":\"${SECRET_ID}\"}" \
-  ${BAO_ADDR}/v1/auth/approle/login)
-
-TOKEN=$(echo "$TOKEN_JSON" | jq -r '.auth.client_token')
-
-if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-  echo "ERROR: Failed to authenticate with OpenBAO"
-  exit 1
-fi
-
-echo "Authenticated successfully, retrieving OAuth secret..."
-
-# Retrieve OAuth secret
-SECRET_JSON=$(curl -s -H "X-Vault-Token: ${TOKEN}" \
-  ${BAO_ADDR}/v1/secret/data/grafana/oauth)
-
-CLIENT_SECRET=$(echo "$SECRET_JSON" | jq -r '.data.data.client_secret')
-
-if [ -z "$CLIENT_SECRET" ] || [ "$CLIENT_SECRET" = "null" ]; then
-  echo "ERROR: Failed to retrieve OAuth client secret"
-  exit 1
-fi
-
-echo "Secret retrieved successfully, starting Grafana..."
-
-# CRITICAL: exec env pattern ensures variable persists to Grafana process
-exec env GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="$CLIENT_SECRET" /run.sh
-EOF
-
-chmod 755 grafana/entrypoint.sh
-```
-
-### Step 3: Create Prometheus Configuration
-
-```bash
-cat > prometheus/prometheus.yml << 'EOF'
-# Prometheus Configuration
-# Published by Oob Skulden™
-
+```yaml
+# ~/monitoring/prometheus/prometheus.yml
 global:
-  scrape_interval: 30s
-  evaluation_interval: 30s
-  external_labels:
-    monitor: 'grafana-lab-monitor'
+  scrape_interval: 15s
+  evaluation_interval: 15s
 
 scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
-  
+
   - job_name: 'grafana'
     static_configs:
       - targets: ['grafana:3000']
-  
+
   - job_name: 'node-exporter'
     static_configs:
       - targets: ['node-exporter:9100']
-  
+
   - job_name: 'cadvisor'
     static_configs:
       - targets: ['cadvisor:8080']
-  
-  - job_name: 'blackbox-http'
-    metrics_path: /probe
-    params:
-      module: [http_2xx]
+
+  - job_name: 'blackbox'
     static_configs:
-      - targets:
-          - http://10.10.75.10:3000
-          - http://10.10.80.10:9000
-          - http://10.10.100.10:8200
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: blackbox-exporter:9115
-EOF
+      - targets: ['blackbox-exporter:9115']
 ```
 
-### Step 4: Create Environment File
+Notice the scrape targets use container names like `grafana:3000` and `node-exporter:9100` instead of IP addresses. Docker Compose creates an internal DNS where each container's service name resolves to its IP on the shared bridge network. This is why `http://prometheus:9090` works inside the stack -- it's not a hostname you configured, it's Docker's built-in service discovery.
 
-```bash
-cat > .env << 'EOF'
-# Grafana Admin Credentials
-GF_SECURITY_ADMIN_USER=admin
-GF_SECURITY_ADMIN_PASSWORD=YourStrongGrafanaPassword
+### Monitoring Stack Docker Compose
 
-# OpenBAO AppRole Credentials
-BAO_ROLE_ID=<your-grafana-role-id>
-BAO_SECRET_ID=<your-grafana-secret-id>
-EOF
+```yaml
+# ~/monitoring/docker-compose.yml
+networks:
+  grafana_network:
+    external: true
+  prometheus_network:
+    external: true
 
-chmod 600 .env
-```
-
-### Step 5: Create Docker Compose File
-
-```bash
-cat > docker-compose.yml << 'EOF'
-version: '3.8'
+volumes:
+  grafana-data:
+    external: true
+  prometheus-data:
+    external: true
+  prometheus-config:
+    external: true
 
 services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     restart: unless-stopped
-    user: "0"
-    entrypoint: ["/entrypoint.sh"]
+    networks:
+      - grafana_network
     ports:
       - "3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./grafana/entrypoint.sh:/entrypoint.sh:ro
+    env_file:
+      - .env
     environment:
-      # Admin Credentials
       - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
-      
-      # Server
-      - GF_SERVER_ROOT_URL=http://10.10.75.10:3000
-      - GF_SERVER_SERVE_FROM_SUB_PATH=false
-      
-      # Security
-      - GF_USERS_ALLOW_SIGN_UP=false
-      
-      # OpenBAO AppRole (for entrypoint script)
-      - BAO_ROLE_ID=${BAO_ROLE_ID}
-      - BAO_SECRET_ID=${BAO_SECRET_ID}
-    networks:
-      - grafana_network
+      - GF_SERVER_ROOT_URL=http://192.168.75.109:3000
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource,grafana-piechart-panel
 
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     restart: unless-stopped
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
     networks:
       - grafana_network
       - prometheus_network
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus-config:/etc/prometheus
+      - prometheus-data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
 
   blackbox-exporter:
     image: prom/blackbox-exporter:latest
     container_name: blackbox-exporter
     restart: unless-stopped
-    ports:
-      - "9115:9115"
     networks:
       - grafana_network
+    ports:
+      - "9115:9115"
 
   node-exporter:
     image: prom/node-exporter:latest
     container_name: node-exporter
     restart: unless-stopped
-    ports:
-      - "9100:9100"
     networks:
       - prometheus_network
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro,rslave
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: cadvisor
     restart: unless-stopped
+    networks:
+      - prometheus_network
     ports:
       - "8080:8080"
     volumes:
-      - /:/rootfs:ro
+      - /:/rootfs:ro,rslave
       - /var/run:/var/run:ro
       - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-    networks:
-      - prometheus_network
-
-networks:
-  grafana_network:
-    driver: bridge
-  prometheus_network:
-    driver: bridge
-
-volumes:
-  grafana-data:
-  prometheus-data:
-EOF
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    privileged: true
 ```
 
-### Step 6: Deploy Stack
+A few things worth calling out in this compose file.
+
+Networks and volumes are `external: true` because we created them manually above. That's the safety net -- `docker compose down -v` won't touch them. Only an explicit `docker volume rm` will destroy your data. Learn from my mistakes on this one.
+
+Prometheus sits on both networks because it has to. It needs `grafana_network` so Grafana can query it, and `prometheus_network` so it can scrape Node Exporter and cAdvisor. No other container needs to span both -- and that's the point. Least privilege at the network layer.
+
+Node Exporter mounts `/proc`, `/sys`, and `/` as read-only to collect host-level metrics. The `rslave` mount propagation on `/rootfs` ensures it sees bind mounts from the host. cAdvisor needs `/var/lib/docker` and `/var/run` to monitor container resource usage, and yes, it requires `privileged: true` for full access to cgroup data. That's a security trade-off we'll revisit in hardening.
+
+### Create the Environment File
+
+The `.env` file needs to exist before the first `docker compose up` -- even if it's sparse. Without it, Compose fails immediately with a missing file error rather than a helpful message.
 
 ```bash
-# Validate configuration
-docker-compose config
-
-# Start services
-docker-compose up -d
-
-# Check status
-docker-compose ps
-
-# View Grafana logs
-docker-compose logs -f grafana
+# ~/monitoring/.env
+GF_SECURITY_ADMIN_USER=admin
+GF_SECURITY_ADMIN_PASSWORD=<your-secure-admin-password>
 ```
 
-### Step 7: Initial Grafana Access
-
-```
-Browser: http://10.10.75.10:3000
-Username: admin
-Password: YourStrongGrafanaPassword
+```bash
+chmod 600 .env
 ```
 
-**You should now have:**
-- Grafana login page
-- Prometheus collecting metrics
-- All exporters running
+### Deploy the Stack
+
+```bash
+cd ~/monitoring
+docker compose up -d
+```
+
+Five containers should come up. Verify:
+
+```bash
+docker compose ps
+
+# Expected:
+# grafana             Up      0.0.0.0:3000->3000/tcp
+# prometheus          Up      0.0.0.0:9090->9090/tcp
+# blackbox-exporter   Up      0.0.0.0:9115->9115/tcp
+# node-exporter       Up      0.0.0.0:9100->9100/tcp
+# cadvisor            Up (healthy)  0.0.0.0:8080->8080/tcp
+```
+
+Check the Grafana logs for anything ugly:
+
+```bash
+docker compose logs grafana | head -30
+```
+
+### Verify the Container Network Layout
+
+This is worth checking explicitly. If Prometheus isn't on both networks, half your scrape targets will show as "DOWN" and the error messages won't tell you why.
+
+```bash
+# Check which containers are on each network
+docker network inspect grafana_network --format '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{"\n"}}{{end}}'
+docker network inspect prometheus_network --format '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{"\n"}}{{end}}'
+
+# Prometheus should appear in both networks
+```
+
+Access Grafana at `http://192.168.75.109:3000` and log in with the admin credentials from your `.env` file.
+
+### Adding Prometheus as a Datasource
+
+In Grafana, go to **Connections**, then **Data sources**, then **Add data source**, and select **Prometheus**. Set the URL to `http://prometheus:9090` -- this is the Docker internal hostname, not the host IP. Click **Save & test**. Green means the stack is wired up. If it fails, Prometheus isn't on `grafana_network`.
+
+### Verify Prometheus Scrape Targets
+
+Hit `http://192.168.75.109:9090/targets` in your browser. All five scrape jobs should show with a recent "Last Scrape" timestamp. If any target shows "DOWN," the problem is almost always that a container is on the wrong Docker network. Check the network layout from the previous step.
+
+### Exposed Ports
+
+One thing to flag before moving on: by default, every service in this stack binds to `0.0.0.0`. That means Prometheus (which has no authentication), Node Exporter, cAdvisor, and Blackbox Exporter are all accessible to anyone who can route to the host.
+
+The instinct is to say "just bind everything to 127.0.0.1" -- but that doesn't work in practice. Prometheus has to reach the exporters over the network to scrape metrics. Grafana has to reach Prometheus to query data. If exporters are running on separate hosts or VLANs -- which they are in most production environments -- binding to localhost means Prometheus can't talk to them at all. The whole scrape architecture assumes network reachability between the collector and its targets. That's why monitoring stacks are one of the most reliably exposed attack surfaces in enterprise environments. These ports aren't open because someone forgot to close them. They're open because the architecture requires it, and nobody goes back to add restrictions after the dashboards are working.
+
+The real mitigation isn't binding to localhost -- it's host-level firewalling. `iptables`, `nftables`, or whatever host firewall your environment runs, scoped to allow only the specific source IPs that need access to each port. Prometheus scrapes Node Exporter? Allow 9100 from the Prometheus host only. Grafana queries Prometheus? Allow 9090 from the Grafana host only. Everything else gets dropped. That's straightforward to implement and it actually matches how these stacks are deployed, instead of pretending everything can live on loopback.
+
+We're leaving them wide open here for the same reason we're running HTTP: you need to see the exposure before you close it. The hardening post will walk through the firewall rules.
 
 ---
 
-<a name="configure-oauth"></a>
-## 5. Configure OAuth Integration
+## Wiring Up OAuth
 
-### Step 1: Create OAuth Provider in Authentik
+### Create the OAuth2 Provider in Authentik
 
-**Access Authentik:** `http://10.10.80.10:9000`
+In Authentik's admin interface (`http://192.168.80.54:9000`), navigate to **Admin > Applications > Providers > Create** and configure an OAuth2/OpenID Provider:
 
-1. Navigate to: **Admin Interface → Applications → Providers**
-2. Click **Create** → **OAuth2/OpenID Provider**
-3. Configure:
-   - **Name:** `grafana-oidc-provider`
-   - **Authorization flow:** `default-provider-authorization-implicit-consent`
-   - **Client Type:** `Confidential`
-   - **Client ID:** `grafana-client`
-   - **Redirect URIs:** `http://10.10.75.10:3000/login/generic_oauth`
-   - **Signing Key:** `authentik Self-signed Certificate`
-   - **Subject mode:** `Based on User's UPN`
-   - **Include claims in id_token:** ✅ Enabled
+| Setting | Value |
+|---|---|
+| Name | `grafana-oidc-provider` |
+| Provider Type | OAuth2/OpenID Provider |
+| Authorization Flow | `default-provider-authorization-implicit-consent` |
+| Client Type | Confidential |
+| Client ID | `grafana-client` |
+| Redirect URIs | `http://192.168.75.109:3000/login/generic_oauth` |
+| Signing Key | authentik Self-signed Certificate |
+| Subject Mode | Based on User's UPN |
+| Include claims in id_token | Enabled |
+| Scopes | `openid`, `profile`, `email`, `groups` |
 
-4. Click **Create**
+The `groups` scope is critical -- without it, Grafana never sees group membership in the token claims, and role-based access control won't work.
 
-### Step 2: Retrieve OAuth Client Secret
+### The Client Secret
 
-**CRITICAL:** Authentik UI truncates the displayed secret!
-
-**Correct procedure:**
-1. Click on the provider you just created
-2. Click **Edit**
-3. Scroll to **Client Secret**
-4. Click the **eye icon** to reveal
-5. Click **Copy** button (NOT selecting and copying text)
-6. Paste into text editor
-7. Verify it's 128 characters long
-
-**Save this secret - you'll store it in OpenBAO next.**
-
-### Step 3: Store OAuth Secret in OpenBAO
-
-**On OpenBAO host:**
+The client secret must be exactly 128 characters and byte-for-byte identical on both the Authentik and Grafana sides. One extra character -- including an invisible trailing newline -- causes "Failed to get token from provider" with no further explanation.
 
 ```bash
-# Access container
-docker exec -it -e BAO_ADDR='http://127.0.0.1:8200' openbao sh
+# Generate a clean 128-char secret
+OAUTH_SECRET=$(openssl rand -base64 128 | tr -dc 'a-zA-Z0-9' | head -c 128)
 
-# Login
-bao login s.YourRootToken
-
-# Store OAuth secret
-bao kv put secret/grafana/oauth \
-  client_id=grafana-client \
-  client_secret=Your128CharacterSecretHere
-
-# Verify storage
-bao kv get secret/grafana/oauth
-
-# Exit
-exit
+# Verify BEFORE pasting anywhere
+echo -n "$OAUTH_SECRET" | wc -c  # Must return exactly 128
 ```
 
-### Step 4: Create Authentik Application
+Use `-base64 128`, not 96. After `tr` strips non-alphanumeric characters, 96 bytes of base64 frequently yields fewer than 128 usable characters. Generate it in the terminal, verify the count, then paste it into both Authentik's provider config and Grafana's `.env`. Save it in your password manager immediately.
 
-Back in Authentik UI:
+To set it in Authentik: navigate to **Providers > grafana-oidc-provider > Edit**, clear the Client Secret field completely, paste your 128-character secret, and click **Update**. Do not use the built-in "Generate" button -- it produces a secret that the UI may truncate on display, making it impossible to verify the full value.
 
-1. Navigate to: **Applications → Applications**
-2. Click **Create**
-3. Configure:
-   - **Name:** `Grafana`
-   - **Slug:** `grafana`
-   - **Provider:** Select `grafana-oidc-provider`
-   - **Launch URL:** `http://10.10.75.10:3000`
+### Create the Authentik Application
 
-4. Click **Create**
+Navigate to **Admin > Applications > Applications > Create**:
 
-### Step 5: Create Groups
-
-1. Navigate to: **Directory → Groups**
-2. Create **Grafana Admins** group:
-   - Name: `Grafana Admins`
-   - Parent: (none)
-3. Create **Grafana Viewers** group:
-   - Name: `Grafana Viewers`
-   - Parent: (none)
-
-### Step 6: Create Test Users
-
-1. Navigate to: **Directory → Users**
-2. Create admin test user:
-   - Username: `alice`
-   - Name: `Alice Admin`
-   - Email: `alice@example.com`
-   - Set password
-   - Groups: Add to **Grafana Admins**
-
-3. Create viewer test user:
-   - Username: `bob`
-   - Name: `Bob Viewer`
-   - Email: `bob@example.com`
-   - Set password
-   - Groups: Add to **Grafana Viewers**
-
-### Step 7: Configure Grafana OAuth
-
-**On Grafana host, update docker-compose.yml:**
-
-```yaml
-services:
-  grafana:
-    environment:
-      # ... existing environment variables ...
-      
-      # OAuth Configuration
-      - GF_AUTH_GENERIC_OAUTH_ENABLED=true
-      - GF_AUTH_GENERIC_OAUTH_NAME=Authentik
-      - GF_AUTH_GENERIC_OAUTH_CLIENT_ID=grafana-client
-      # CLIENT_SECRET injected by entrypoint.sh from OpenBAO
-      - GF_AUTH_GENERIC_OAUTH_SCOPES=openid profile email groups
-      - GF_AUTH_GENERIC_OAUTH_AUTH_URL=http://10.10.80.10:9000/application/o/authorize/
-      - GF_AUTH_GENERIC_OAUTH_TOKEN_URL=http://10.10.80.10:9000/application/o/token/
-      - GF_AUTH_GENERIC_OAUTH_API_URL=http://10.10.80.10:9000/application/o/userinfo/
-      - GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=contains(groups[*], 'Grafana Admins') && 'Admin' || 'Viewer'
-      - GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=true
-      - GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN=false
+```
+Name: Grafana
+Slug: grafana
+Provider: grafana-oidc-provider (select from dropdown)
+Launch URL: http://192.168.75.109:3000
+Policy engine mode: any
 ```
 
-Restart Grafana:
+The slug must be `grafana` exactly -- not `Grafana`, not `grafana-monitoring`, not anything creative. The OIDC discovery URL is derived from it: `http://192.168.80.54:9000/application/o/grafana/.well-known/openid-configuration`. If the slug doesn't match, that endpoint returns a 404 and the entire OAuth flow fails with no useful error message.
+
+### Verify OIDC Discovery
+
+Before touching Grafana's config, confirm the discovery endpoint works:
 
 ```bash
-docker-compose up -d --force-recreate grafana
+curl http://192.168.80.54:9000/application/o/grafana/.well-known/openid-configuration | jq
 ```
 
----
-
-<a name="initial-validation"></a>
-## 6. Initial Validation
-
-### Test 1: Local Admin Login
-
-```
-Browser: http://10.10.75.10:3000
-Username: admin
-Password: YourStrongGrafanaPassword
-Result: Logged in successfully ✓
-```
-
-### Test 2: OAuth Login (Admin User)
-
-```
-1. Logout from Grafana
-2. Click "Sign in with Authentik"
-3. Redirected to Authentik
-4. Login as: alice / [password]
-5. Redirected back to Grafana
-6. Check user role: Admin ✓
-```
-
-### Test 3: OAuth Login (Viewer User)
-
-```
-1. Logout
-2. Sign in with Authentik
-3. Login as: bob / [password]
-4. Check user role: Viewer ✓
-```
-
-### Test 4: Prometheus Connectivity
-
-```
-Grafana UI:
-1. Go to Connections → Data Sources
-2. Click "Add data source"
-3. Select Prometheus
-4. URL: http://prometheus:9090
-5. Click "Save & test"
-Result: "Data source is working" ✓
-```
-
-### Test 5: Create Test Dashboard
-
-```
-1. Create → Dashboard
-2. Add visualization
-3. Query: up
-4. Should show all targets (prometheus, grafana, exporters)
-Result: Metrics displaying ✓
-```
-
-### Current Security Posture: Baseline Functional
-
-**What's working:**
-- OAuth authentication ✓
-- Group-based authorization ✓
-- Metrics collection ✓
-- Multi-VLAN segmentation ✓
-
-**What's vulnerable:**
-- All traffic cleartext HTTP ❌
-- Sessions persist indefinitely ❌
-- Prometheus unauthenticated ❌
-- OAuth secret visible in container ❌
-- Container running as root ❌
-- No resource limits ❌
-
-**Time to deployment:** ~2-3 hours
-
-**Next: Part 2 - Security Hardening**
-
----
-
-## Part 2: Security Hardening
-
-<a name="phase-1-sessions"></a>
-## 7. Phase 1: Session Hardening
-
-**Goal:** Force session expiration and implement token rotation.
-
-**Duration:** ~15 minutes
-
-### The Problem
-
-Testing revealed that disabling a user account in Authentik didn't immediately revoke their Grafana session. Sessions remained valid for 7+ days after account deletion - a critical security gap.
-
-### Implementation
-
-**Update docker-compose.yml:**
-
-```yaml
-services:
-  grafana:
-    environment:
-      # ... existing vars ...
-      
-      # Phase 1: Session Hardening
-      - GF_AUTH_LOGIN_MAXIMUM_INACTIVE_LIFETIME_DURATION=1h
-      - GF_AUTH_LOGIN_MAXIMUM_LIFETIME_DURATION=24h
-      - GF_AUTH_TOKEN_ROTATION_INTERVAL_MINUTES=10
-```
-
-**What these do:**
-- `MAXIMUM_INACTIVE_LIFETIME_DURATION=1h` - Session expires after 1 hour of inactivity
-- `MAXIMUM_LIFETIME_DURATION=24h` - Absolute maximum session lifetime (even if active)
-- `TOKEN_ROTATION_INTERVAL_MINUTES=10` - OAuth tokens rotate every 10 minutes
-
-**Apply changes:**
-
-```bash
-docker-compose up -d --force-recreate grafana
-```
-
-### Validation
-
-**Test 1: Inactivity timeout**
-```
-1. Login to Grafana
-2. Leave browser open for 65 minutes (no activity)
-3. Try to navigate to dashboard
-Result: Forced redirect to login page ✓
-```
-
-**Test 2: Maximum lifetime**
-```
-1. Login to Grafana
-2. Actively use dashboards for 25 hours
-Result: Session expired, forced re-login ✓
-```
-
-**Test 3: OAuth still functional**
-```
-1. Click "Sign in with Authentik"
-2. Redirected to Authentik → back to Grafana
-Result: Logged in successfully ✓
-```
-
-### What We Learned
-
-**Initial timeout of 15 minutes was too aggressive** - users complained of constant re-authentication interrupting dashboard analysis.
-
-**Final balance:**
-- 1 hour inactivity = reasonable for analyst workflows
-- 24 hour max = catches abandoned sessions
-- 10 minute token rotation = limits stolen token abuse window
-
-**Security improvement:** Sessions now have defined lifecycle, reducing unauthorized access window from days to hours.
-
-**Security posture: Baseline Functional → Session-Controlled**
-
----
-
-<a name="phase-2-tls"></a>
-## 8. Phase 2: TLS Encryption
-
-**Goal:** Eliminate cleartext HTTP traffic with TLS termination.
-
-**Duration:** ~1-2 hours
-
-### The Problem
-
-All traffic was cleartext HTTP:
-- Session cookies (sniffable on network)
-- OAuth tokens (visible in transit)
-- Dashboard data (infrastructure topology exposed)
-
-Wireshark capture showed everything in plaintext:
-```
-Cookie: grafana_session=5e8d7f9a2b1c3d4e...
-Authorization: Bearer eyJhbGci...
-```
-
-### Implementation
-
-**Step 1: Issue Certificate from OpenBAO**
-
-On OpenBAO host:
-
-```bash
-docker exec -it -e BAO_ADDR='http://127.0.0.1:8200' openbao sh
-
-bao login s.YourRootToken
-
-# Issue certificate
-bao write -format=json pki/issue/grafana-server \
-  common_name="10.10.75.10" \
-  ip_sans="10.10.75.10" \
-  ttl="720h" > /tmp/grafana-cert.json
-
-# Extract components
-jq -r '.data.certificate' /tmp/grafana-cert.json > /tmp/grafana.crt
-jq -r '.data.private_key' /tmp/grafana-cert.json > /tmp/grafana.key
-jq -r '.data.issuing_ca' /tmp/grafana-cert.json > /tmp/grafana-ca.crt
-
-# Create HAProxy bundle (ORDER MATTERS!)
-cat /tmp/grafana.crt /tmp/grafana.key /tmp/grafana-ca.crt > /tmp/grafana.pem
-
-# Verify
-openssl x509 -in /tmp/grafana.pem -noout -subject -dates
-
-exit
-```
-
-**Step 2: Copy Certificate to Grafana Host**
-
-```bash
-# On OpenBAO host
-scp /tmp/grafana.pem user@10.10.75.10:/tmp/
-
-# On Grafana host
-sudo mkdir -p /etc/haproxy/certs
-sudo cp /tmp/grafana.pem /etc/haproxy/certs/
-sudo chown haproxy:haproxy /etc/haproxy/certs/grafana.pem
-sudo chmod 600 /etc/haproxy/certs/grafana.pem
-```
-
-**Step 3: Install HAProxy**
-
-```bash
-sudo apt update
-sudo apt install haproxy -y
-haproxy -v  # Should be 2.x or 3.x
-```
-
-**Step 4: Configure HAProxy**
-
-```bash
-sudo nano /etc/haproxy/haproxy.cfg
-```
-
-**Add this configuration:**
-
-```haproxy
-global
-    log /dev/log local0
-    log /dev/log local1 notice
-    chroot /var/lib/haproxy
-    stats socket /run/haproxy/admin.sock mode 660 level admin
-    stats timeout 30s
-    user haproxy
-    group haproxy
-    daemon
-
-    # SSL Configuration
-    ca-base /etc/ssl/certs
-    crt-base /etc/ssl/private
-    ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384
-    ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
-
-defaults
-    log     global
-    mode    http
-    option  httplog
-    option  dontlognull
-    timeout connect 5000
-    timeout client  50000
-    timeout server  50000
-
-# HTTP frontend - redirect to HTTPS
-frontend http_grafana
-    bind *:80
-    redirect scheme https code 301
-
-# HTTPS frontend - TLS termination
-frontend https_grafana
-    bind *:443 ssl crt /etc/haproxy/certs/grafana.pem
-    
-    # Security headers
-    http-response set-header Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    http-response set-header X-Frame-Options "SAMEORIGIN"
-    http-response set-header X-Content-Type-Options "nosniff"
-    http-response set-header X-XSS-Protection "1; mode=block"
-    http-response set-header Referrer-Policy "strict-origin-when-cross-origin"
-    
-    # Rate limiting: 100 requests per 10 seconds per IP
-    stick-table type ip size 100k expire 30s store http_req_rate(10s)
-    http-request track-sc0 src
-    http-request deny deny_status 429 if { sc_http_req_rate(0) gt 100 }
-    
-    default_backend grafana_backend
-
-# Backend - Grafana on localhost
-backend grafana_backend
-    mode http
-    balance roundrobin
-    option forwardfor
-    http-request set-header X-Forwarded-Proto https
-    server grafana 127.0.0.1:3000 check
-
-# Stats page (localhost only!)
-frontend stats
-    bind 127.0.0.1:8404
-    stats enable
-    stats uri /stats
-    stats refresh 30s
-    stats admin if TRUE
-```
-
-**Step 5: Validate and Start HAProxy**
-
-```bash
-# Test configuration
-sudo haproxy -c -f /etc/haproxy/haproxy.cfg
-
-# Enable and start
-sudo systemctl enable haproxy
-sudo systemctl start haproxy
-
-# Check status
-sudo systemctl status haproxy
-
-# Verify listening ports
-sudo ss -tlnp | grep haproxy
-# Should show: 80, 443, 8404 (localhost only)
-```
-
-**Step 6: Update Grafana Configuration**
-
-```yaml
-# docker-compose.yml
-services:
-  grafana:
-    ports:
-      - "127.0.0.1:3000:3000"  # Localhost only now
-    environment:
-      # ... existing vars ...
-      
-      # Update root URL to HTTPS
-      - GF_SERVER_ROOT_URL=https://10.10.75.10
-      
-      # Enable secure cookies (only after HAProxy is working!)
-      - GF_SECURITY_COOKIE_SECURE=true
-```
-
-**Step 7: Update Authentik OAuth Redirect**
-
-In Authentik UI:
-
-1. Navigate to: **Applications → Providers → grafana-oidc-provider → Edit**
-2. Update **Redirect URIs:**
-   - Remove: `http://10.10.75.10:3000/login/generic_oauth`
-   - Add: `https://10.10.75.10/login/generic_oauth`
-3. Save
-
-**Step 8: Restart Grafana**
-
-```bash
-docker-compose up -d --force-recreate grafana
-```
-
-### Validation
-
-**Test 1: HTTP redirects to HTTPS**
-```bash
-curl -I http://10.10.75.10
-# HTTP/1.1 301 Moved Permanently
-# Location: https://10.10.75.10/ ✓
-```
-
-**Test 2: TLS handshake**
-```bash
-openssl s_client -connect 10.10.75.10:443 -showcerts
-# Verify return code: 0 (ok) ✓
-```
-
-**Test 3: Security headers**
-```bash
-curl -I https://10.10.75.10
-# Strict-Transport-Security: max-age=31536000 ✓
-# X-Frame-Options: SAMEORIGIN ✓
-```
-
-**Test 4: Rate limiting**
-```bash
-# Rapid requests
-for i in {1..150}; do curl -s https://10.10.75.10 > /dev/null; done
-# Around request 101+: HTTP 429 Too Many Requests ✓
-```
-
-**Test 5: OAuth via HTTPS**
-```
-Browser: https://10.10.75.10
-Click "Sign in with Authentik"
-Redirected to Authentik → back to Grafana
-Logged in successfully ✓
-```
-
-### What We Learned
-
-**1. Certificate order in PEM bundle is critical**
-
-Wrong: `cat key crt ca` = HAProxy failure
-
-Correct: `cat crt key ca` = Works
-
-HAProxy parses sequentially: server cert → private key → CA chain.
-
-**2. OAuth migration sequence matters**
-
-Wrong sequence:
-1. Enable secure cookies
-2. Update Authentik URIs
-Result: "redirect_uri_mismatch" error
-
-Correct sequence:
-1. Deploy HAProxy
-2. Update Authentik URIs to HTTPS
-3. Test OAuth
-4. Then enable secure cookies
-
-**3. Stats page must be localhost-only**
-
-`bind *:8404` exposes backend status to network (information disclosure).
-
-`bind 127.0.0.1:8404` = Access only via SSH tunnel.
-
-**4. systemctl reload vs restart**
-
-`restart` = Downtime (all connections dropped)
-
-`reload` = Zero downtime:
-- New workers start with new cert
-- Old connections continue on old workers
-- New connections use new workers
-- Graceful switchover
-
-**Security posture: Session-Controlled → Transport-Secured**
-
----
-
-<a name="phase-3-prometheus"></a>
-## 9. Phase 3: Prometheus Authentication
-
-**Goal:** Prevent unauthorized infrastructure enumeration.
-
-**Duration:** ~15 minutes
-
-### The Problem
-
-Prometheus exposed complete infrastructure topology without authentication:
-
-```bash
-curl http://10.10.75.10:9090/api/v1/targets | jq
-# Returns: All monitored systems, software versions, network map
-```
-
-### Implementation
-
-**Step 1: Generate Bcrypt Password**
-
-```bash
-sudo apt install apache2-utils
-
-# Generate strong password
-PROMETHEUS_PASSWORD=$(openssl rand -base64 32)
-echo "Prometheus Password: $PROMETHEUS_PASSWORD"
-# Save in password manager!
-
-# Generate bcrypt hash
-htpasswd -nbBC 10 prometheus "$PROMETHEUS_PASSWORD"
-# Output: prometheus:$2y$10$hash...
-```
-
-**Step 2: Create Prometheus Web Config**
-
-```bash
-cat > ~/monitoring/prometheus/web-config.yml << EOF
-basic_auth_users:
-  prometheus: <your-bcrypt-hash-from-htpasswd>
-EOF
-
-chmod 600 ~/monitoring/prometheus/web-config.yml
-```
-
-**Step 3: Update docker-compose.yml**
-
-```yaml
-services:
-  prometheus:
-    ports:
-      - "127.0.0.1:9090:9090"  # Localhost only
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/web-config.yml:/etc/prometheus/web-config.yml:ro
-      - prometheus-data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
-      - '--web.config.file=/etc/prometheus/web-config.yml'  # Add this
-```
-
-**Step 4: Create Grafana Datasource Provisioning**
-
-```bash
-mkdir -p ~/monitoring/grafana/provisioning/datasources
-
-cat > ~/monitoring/grafana/provisioning/datasources/prometheus.yml << EOF
-apiVersion: 1
-
-datasources:
-  - name: Prometheus
-    type: prometheus
-    access: proxy
-    url: http://prometheus:9090
-    isDefault: true
-    editable: false
-    basicAuth: true
-    basicAuthUser: prometheus
-    secureJsonData:
-      basicAuthPassword: \${PROMETHEUS_PASSWORD}
-    jsonData:
-      httpMethod: POST
-      timeInterval: 30s
-EOF
-```
-
-**Step 5: Update .env file**
-
-```bash
-# Add to ~/monitoring/.env
-PROMETHEUS_PASSWORD=YourGeneratedPasswordHere
-```
-
-**Step 6: Update docker-compose.yml to mount provisioning**
-
-```yaml
-services:
-  grafana:
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./grafana/entrypoint.sh:/entrypoint.sh:ro
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro  # Add this
-```
-
-**Step 7: Restart Stack**
-
-```bash
-docker-compose down
-docker-compose up -d
-```
-
-### Validation
-
-**Test 1: Unauthenticated access blocked**
-```bash
-curl http://localhost:9090/metrics
-# 401 Unauthorized ✓
-```
-
-**Test 2: Authenticated access works**
-```bash
-curl -u prometheus:$PROMETHEUS_PASSWORD http://localhost:9090/metrics
-# Returns metrics ✓
-```
-
-**Test 3: Grafana queries work**
-```
-Grafana UI → Explore
-Query: up
-Result: Shows all targets ✓
-```
-
-**Test 4: External access blocked**
-```bash
-# From different machine
-curl http://10.10.75.10:9090
-# Connection refused ✓
-```
-
-### What We Learned
-
-**1. Localhost binding = defense-in-depth**
-
-Even with auth, `0.0.0.0:9090` exposes service to network scanners.
-
-`127.0.0.1:9090` = Network can't reach it at all.
-
-**2. Provisioned datasources prevent credential leakage**
-
-Manual datasource in UI → password visible in dashboard JSON export.
-
-Provisioned with `secureJsonData` → password encrypted, never exported.
-
-**Security posture: Transport-Secured → Access-Controlled**
-
----
-
-<a name="phase-4-secrets"></a>
-## 10. Phase 4: Secrets Management
-
-**Goal:** Eliminate all hardcoded secrets.
-
-**Duration:** ~30 minutes
-
-### The Problem
-
-Secrets still visible:
-
-```bash
-docker compose config  # Shows all environment variables
-docker inspect grafana  # "Env": ["PASSWORD=..."]
-```
-
-### Implementation
-
-**Already implemented in initial deployment:**
-
-The entrypoint.sh script retrieves OAuth secret from OpenBAO at startup using AppRole authentication. This pattern eliminates hardcoded secrets.
-
-**Verification:**
-
-```bash
-# Secret not in compose file
-docker compose config | grep client_secret
-# No results ✓
-
-# Secret not in container inspect
-docker inspect grafana | grep -i oauth | grep -i secret
-# No client secret visible ✓
-
-# OAuth login still works
-# Browser → Sign in with Authentik → Success ✓
-```
-
-### What We Learned
-
-**Secret rotation simplified:**
-
-Before:
-1. Generate in Authentik
-2. Update docker-compose.yml
-3. Restart Grafana
-4. Hope no typos
-
-After:
-1. Generate in Authentik
-2. `bao kv put secret/grafana/oauth client_secret=NewSecret`
-3. Restart Grafana (auto-retrieves)
-
-Auditable, no compose edits, version controlled in OpenBAO.
-
-**Security posture: Access-Controlled → Secrets-Managed**
-
----
-
-<a name="phase-5-containers"></a>
-## 11. Phase 5: Container Hardening
-
-**Goal:** Apply least-privilege container security.
-
-**Duration:** ~20 minutes
-
-### The Problem
-
-Container running as root with all Linux capabilities = If Grafana is compromised, attacker has full container access and potential host breakout.
-
-### Implementation (Iterative)
-
-**Attempt 1: Full hardening**
-
-```yaml
-services:
-  grafana:
-    user: "472:472"
-    read_only: true
-    cap_drop:
-      - ALL
-```
-
-**Result:** Crash loop
-
-```
-Error: ✗ attempt to write a readonly database
-```
-
-**Cause:** Grafana uses SQLite which requires write operations even with writable volume.
-
-**Attempt 2: Add necessary capabilities**
-
-```yaml
-services:
-  grafana:
-    user: "0"  # Still root, but restricted
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN        # File ownership
-      - SETGID       # Set GID
-      - SETUID       # Set UID
-      - DAC_OVERRIDE # Bypass file permissions (SQLite needs this!)
-    security_opt:
-      - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-```
-
-**Result:** Success!
-
-**Apply:**
-
-```bash
-docker-compose up -d --force-recreate grafana
-```
-
-### Validation
-
-```bash
-# Capabilities verified
-docker inspect grafana --format='{{json .HostConfig.CapDrop}}' | jq
-# ["ALL"] ✓
-
-docker inspect grafana --format='{{json .HostConfig.CapAdd}}' | jq
-# ["CHOWN","SETGID","SETUID","DAC_OVERRIDE"] ✓
-
-# No privilege escalation
-docker inspect grafana --format='{{json .HostConfig.SecurityOpt}}' | jq
-# ["no-new-privileges:true"] ✓
-
-# Resource limits
-docker inspect grafana --format='{{.HostConfig.Memory}}'
-# 2147483648 (2GB) ✓
-
-# Grafana functions normally
-# Login, dashboards, queries all work ✓
-```
-
-### What We Learned
-
-**Application architecture defines security boundaries**
-
-Grafana with SQLite cannot use read-only root filesystem. No workarounds change this.
-
-Alternative: PostgreSQL backend (requires Grafana Enterprise or external DB).
-
-**Test incrementally**
-
-Applied capabilities one at a time, tested each addition. If all applied at once → combinatorial troubleshooting nightmare.
-
-**Backups before risky changes**
-
-Pre-Phase 5: Backed up compose file, volumes, database.
-
-When read-only attempt corrupted database → restored in < 5 minutes.
-
-**Security posture: Secrets-Managed → Containment-Hardened**
-
----
-
-<a name="phase-6-production"></a>
-## 12. Phase 6: Production Readiness
-
-**Goal:** Automation, audit logging, final security controls.
-
-**Duration:** ~1 hour
-
-### Phase 6.1: Automated Certificate Renewal
-
-**Problem:** 30-day certificates require manual renewal → outage risk.
-
-**Create dedicated PKI AppRole:**
-
-```bash
-docker exec -it -e BAO_ADDR='http://127.0.0.1:8200' openbao sh
-
-bao login s.YourRootToken
-
-# Create policy
-cat > /tmp/pki-policy.hcl << 'EOF'
-path "pki/issue/grafana-server" {
-  capabilities = ["create", "update"]
+This should return JSON with `issuer`, `authorization_endpoint`, `token_endpoint`, and `userinfo_endpoint`:
+
+```json
+{
+  "issuer": "http://192.168.80.54:9000/application/o/grafana/",
+  "authorization_endpoint": "http://192.168.80.54:9000/application/o/authorize/",
+  "token_endpoint": "http://192.168.80.54:9000/application/o/token/",
+  "userinfo_endpoint": "http://192.168.80.54:9000/application/o/userinfo/",
+  "jwks_uri": "http://192.168.80.54:9000/application/o/grafana/jwks/"
 }
-EOF
-
-bao policy write pki-renew-grafana /tmp/pki-policy.hcl
-
-# Create AppRole
-bao write auth/approle/role/pki-grafana-renew \
-  token_policies="pki-renew-grafana" \
-  token_ttl=5m
-
-# Get credentials (save these)
-bao read auth/approle/role/pki-grafana-renew/role-id
-bao write -f auth/approle/role/pki-grafana-renew/secret-id
-
-exit
 ```
 
-**Create renewal script:**
+If you get a 404, the application slug doesn't match "grafana." If the connection is refused, check that port 9000 is accessible from the Grafana host across VLANs.
 
-```bash
-sudo nano /usr/local/bin/renew-grafana-cert.sh
+### Group-Based Access Control
+
+Create three groups in Authentik under **Admin > Directory > Groups**:
+
+| Group Name | Grafana Role | Purpose |
+|---|---|---|
+| Grafana Admins | Admin | Full admin access |
+| Grafana Editors | Editor | Dashboard creation and editing |
+| Grafana Viewers | Viewer | Read-only dashboard access |
+
+Then bind all three groups to the Grafana application: go to **Admin > Applications > Grafana > Policy / Group / User Bindings**, add each group as a binding, and set the policy engine to "any." Users not in any of these groups get denied at the Authentik level and never reach Grafana at all. That's defense-in-depth working as intended.
+
+### Create Test Users
+
+This step is not optional. Create dedicated test accounts in Authentik under **Admin > Directory > Users**. Do not test OAuth with the `akadmin` account. You will regret it. Issue #11 below documents exactly what happens when admin test data pollutes Grafana's user database -- and the fix is more annoying than the five minutes it takes to create proper test accounts.
+
+```
+Test Admin User:
+  Username: grafana-admin
+  Email: grafana-admin@lab.local
+  Groups: Grafana Admins
+
+Test Viewer User:
+  Username: grafana-viewer
+  Email: grafana-viewer@lab.local
+  Groups: Grafana Viewers
 ```
 
+### Configure Grafana for OAuth
+
+Update the Grafana `.env` file with the full OAuth configuration. Configure all of these at once. Partial OAuth configuration causes cascading cryptic errors that are nearly impossible to diagnose individually.
+
+`GF_SERVER_ROOT_URL` is mandatory. Without it, Grafana constructs OAuth redirect URIs using `localhost`, and Authentik rightfully rejects them.
+
 ```bash
-#!/bin/bash
-set -e
-
-OPENBAO_ADDR="http://10.10.100.10:8200"
-ROLE_ID="your-pki-role-id"
-SECRET_ID="your-pki-secret-id"
-CERT_PATH="/etc/haproxy/certs/grafana.pem"
-
-# Authenticate
-TOKEN=$(curl -s -X POST \
-  -d "{\"role_id\":\"${ROLE_ID}\",\"secret_id\":\"${SECRET_ID}\"}" \
-  ${OPENBAO_ADDR}/v1/auth/approle/login | jq -r '.auth.client_token')
-
-# Issue certificate
-CERT_JSON=$(curl -s -H "X-Vault-Token: ${TOKEN}" -X POST \
-  -d '{"common_name":"10.10.75.10","ip_sans":"10.10.75.10","ttl":"720h"}' \
-  ${OPENBAO_ADDR}/v1/pki/issue/grafana-server)
-
-# Extract and bundle
-CERT=$(echo "$CERT_JSON" | jq -r '.data.certificate')
-KEY=$(echo "$CERT_JSON" | jq -r '.data.private_key')
-CA=$(echo "$CERT_JSON" | jq -r '.data.issuing_ca')
-
-cat > /tmp/new.pem << EOF
-${CERT}
-${KEY}
-${CA}
-EOF
-
-# Install
-cp /tmp/new.pem "$CERT_PATH"
-chmod 600 "$CERT_PATH"
-chown haproxy:haproxy "$CERT_PATH"
-
-# Reload HAProxy (zero downtime)
-systemctl reload haproxy
-
-echo "Certificate renewed: $(date)"
+# ~/monitoring/.env
+GF_SECURITY_ADMIN_USER=admin
+GF_SECURITY_ADMIN_PASSWORD=<your-secure-admin-password>
+GF_SERVER_ROOT_URL=http://192.168.75.109:3000
+GF_AUTH_GENERIC_OAUTH_ENABLED=true
+GF_AUTH_GENERIC_OAUTH_NAME=Authentik
+GF_AUTH_GENERIC_OAUTH_CLIENT_ID=grafana-client
+GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=<128-char-secret>
+GF_AUTH_GENERIC_OAUTH_SCOPES=openid profile email groups
+GF_AUTH_GENERIC_OAUTH_AUTH_URL=http://192.168.80.54:9000/application/o/authorize/
+GF_AUTH_GENERIC_OAUTH_TOKEN_URL=http://192.168.80.54:9000/application/o/token/
+GF_AUTH_GENERIC_OAUTH_API_URL=http://192.168.80.54:9000/application/o/userinfo/
+GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=true
+GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN=false
+GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=contains(groups[*], 'Grafana Admins') && 'Admin' || 'Viewer'
+GF_USERS_ALLOW_SIGN_UP=false
 ```
 
 ```bash
-sudo chmod 700 /usr/local/bin/renew-grafana-cert.sh
-
-# Schedule cron (every 20 days at 2 AM)
-sudo crontab -e
-# Add: 0 2 */20 * * /usr/local/bin/renew-grafana-cert.sh >> /var/log/grafana-cert-renewal.log 2>&1
+chmod 600 .env
+docker compose up -d --force-recreate
 ```
 
-### Phase 6.2: Audit Logging
+That `--force-recreate` flag is not optional. `docker compose restart` does not reload `.env` variables. Environment variables are baked into the container at creation time. If you change the `.env` and just restart, nothing changes, and you'll spend an hour wondering why your config updates aren't taking effect.
 
-```yaml
-# docker-compose.yml
-services:
-  grafana:
-    environment:
-      # ... existing ...
-      
-      # Audit Logging
-      - GF_LOG_MODE=console file
-      - GF_LOG_LEVEL=info
-      - GF_LOG_FILE_FORMAT=json
-      - GF_LOG_FILE_LOG_ROTATE=true
-      - GF_LOG_FILE_MAX_DAYS=30
-```
-
-```bash
-docker-compose up -d --force-recreate grafana
-```
-
-### Phase 6.3: Snapshot Security
-
-```yaml
-services:
-  grafana:
-    environment:
-      # ... existing ...
-      
-      # Snapshot Security
-      - GF_SNAPSHOTS_EXTERNAL_ENABLED=false
-      - GF_SNAPSHOTS_EXTERNAL_SNAPSHOT_URL=
-```
-
-```bash
-docker-compose up -d --force-recreate grafana
-```
+The `role_attribute_path` JMESPath expression handles group-to-role mapping: if a user is in the "Grafana Admins" group, they get Admin. Everyone else gets Viewer.
 
 ### Validation
 
+First, confirm Grafana actually loaded the OAuth configuration. This sounds obvious. It is not.
+
 ```bash
-# Certificate renewal works
-sudo /usr/local/bin/renew-grafana-cert.sh
-# Certificate renewed: ... ✓
-
-# Logs in JSON format
-docker exec grafana cat /var/log/grafana/grafana.log | jq
-# Valid JSON ✓
-
-# External snapshots disabled
-# Grafana UI → Share → Snapshot
-# "External snapshot service is disabled" ✓
+docker exec grafana env | grep GF_AUTH
 ```
 
-**Security posture: Containment-Hardened → Production-Hardened**
+If this returns nothing, the container wasn't recreated properly. Run `docker compose up -d --force-recreate` again. This is Issue #6 in action.
 
----
+Now test the full OAuth flow with your dedicated test accounts. Four scenarios, all of them matter:
 
-## Part 3: Operations
+**Admin test:** Open `http://192.168.75.109:3000`, click "Sign in with Authentik," log in as `grafana-admin`. Verify you land on the Grafana dashboard with Admin role. Confirm you can access Configuration (gear icon) and Server Admin (shield icon).
 
-<a name="final-posture"></a>
-## 13. Final Security Posture
+**Viewer test:** Log out, log in as `grafana-viewer`. Verify you get Viewer-level access -- no admin capabilities, read-only dashboard access.
 
-### Security Posture Journey
+**Denied test:** Try logging in with a user who is not in any of the three Grafana groups. Authentik should deny the request before it ever reaches Grafana.
 
-| Phase | Posture | Time | Focus |
-|-------|---------|------|-------|
-| **Initial** | Baseline Functional | 2-3h | Deployment |
-| **Phase 1** | Session-Controlled | 15m | Sessions |
-| **Phase 2** | Transport-Secured | 1-2h | TLS |
-| **Phase 3** | Access-Controlled | 15m | Prometheus |
-| **Phase 4** | Secrets-Managed | 30m | Secrets |
-| **Phase 5** | Containment-Hardened | 20m | Containers |
-| **Phase 6** | Production-Hardened | 1h | Production |
+**Fallback test:** This is the one people skip and then panic about later. Log out, click "Sign in" (not the OAuth button), enter the local admin credentials from your `.env` file. This must work. It's your disaster recovery path if Authentik goes down, and you don't want to discover it's broken at 2 AM.
 
-**Total: ~5-8 hours (2-3h deploy + 3-5h harden)**
+### Verify Group Claims in Logs
 
-### Defense-in-Depth Layers
-
-1. **Network:** Multi-VLAN, localhost binding, rate limiting
-2. **Transport:** TLS 1.2+, HSTS, modern ciphers
-3. **Application:** OAuth SSO, session timeouts, token rotation
-4. **Secrets:** OpenBAO centralized, AppRole, dynamic injection
-5. **Container:** Minimal capabilities, no escalation, resource limits
-6. **Audit:** JSON logs, 30d retention, comprehensive events
-7. **Operational:** Automated lifecycle, tested procedures
-
-### Compliance Mapping
-
-> **Source References:** All compliance mappings below reference publicly available frameworks. See [NIST SP 800-53 Rev. 5](https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final) · [AICPA Trust Services Criteria (SOC 2)](https://www.aicpa-cima.com/resources/landing/system-and-organization-controls-soc-suite-of-services) · [CIS Controls v8](https://www.cisecurity.org/controls)
-
-**NIST 800-53 ([SP 800-53 Rev. 5](https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final)):**
-- AC-2(3): Session termination
-- AC-12: 1h inactive, 24h max
-- AU-2: Audit logging
-- IA-5: AppRole rotation
-- SC-8: TLS encryption
-- SC-28: Secrets encrypted
-
-**SOC 2 ([AICPA Trust Services Criteria](https://www.aicpa-cima.com/resources/landing/system-and-organization-controls-soc-suite-of-services)):**
-- CC6.1: OAuth SSO, session limits
-- CC6.2: AppRole, bcrypt passwords
-- CC6.6: TLS + OpenBAO encryption
-- CC7.2: Audit logs, monitoring
-
-**CIS Controls ([CIS Controls v8](https://www.cisecurity.org/controls)):**
-- 3.3: Hardened containers
-- 6.2: Centralized secrets
-- 6.4: Short-lived credentials
-- 8.2: Audit log collection
-
-### Attack Surface
-
-**Before (Baseline Functional):**
-- Session hijacking: Easy (network sniffing)
-- Credential theft: Easy (docker inspect)
-- Prometheus enumeration: Trivial (no auth)
-- Container breakout: Medium (root + all caps)
-
-**After (Production-Hardened):**
-- Session hijacking: Hard (TLS 1.2+ required)
-- Credential theft: Very Hard (not in metadata)
-- Prometheus enumeration: Hard (auth + localhost)
-- Container breakout: Very Hard (4 caps only)
-
----
-
-<a name="deployment-checklist"></a>
-## 14. Deployment Checklist
-
-### Pre-Deployment
-
-**Infrastructure:**
-- [ ] 3 VMs provisioned (Authentik, OpenBAO, Grafana)
-- [ ] VLANs configured (75, 80, 100)
-- [ ] Firewall rules tested
-- [ ] NTP synchronized
-- [ ] Backup storage ready
-
-**Secrets:**
-- [ ] All passwords in password manager
-- [ ] OpenBAO root token offline backup
-- [ ] OAuth secret in OpenBAO
-- [ ] AppRole credentials in .env (600)
-
-**Certificates:**
-- [ ] OpenBAO PKI configured
-- [ ] Renewal script tested
-- [ ] Cron scheduled
-
-### Deployment Steps
-
-1. [ ] Deploy Authentik
-2. [ ] Deploy OpenBAO
-3. [ ] Deploy Grafana stack
-4. [ ] Configure OAuth
-5. [ ] Validate integration
-6. [ ] Apply all hardening phases
-7. [ ] Final validation
-
-### Post-Deployment
-
-- [ ] Security headers present
-- [ ] Rate limiting works
-- [ ] Sessions timeout
-- [ ] Prometheus auth required
-- [ ] Snapshots disabled
-- [ ] Audit logs generated
-
----
-
-<a name="maintenance"></a>
-## 15. Maintenance Procedures
-
-**Daily:**
-- Spot-check container health
-- Review failed login attempts
-
-**Weekly:**
-- Certificate expiration dates
-- Disk space usage
-- Backup verification
-
-**Monthly:**
-- OAuth flow test
-- Rotate AppRole credentials
-- Update software
-
-**Quarterly:**
-- Policy review
-- Access review
-- Restore test
-
----
-
-<a name="troubleshooting"></a>
-## 16. Troubleshooting Guide
-
-### OAuth "redirect_uri_mismatch"
-
-**Cause:** Authentik redirect URI doesn't match Grafana configuration.
-
-**Fix:**
-1. Check Grafana root URL: `http` vs `https`
-2. Verify Authentik redirect URI matches exactly
-3. Restart Grafana after changes
-
-### Certificate "unable to load SSL certificate"
-
-**Cause:** Wrong order in PEM bundle.
-
-**Fix:**
 ```bash
-# Correct order: cert → key → CA
-cat grafana.crt grafana.key grafana-ca.crt > grafana.pem
+docker compose logs grafana 2>&1 | grep -i 'groups' | tail -10
 ```
 
-### Container crash loop "readonly database"
-
-**Cause:** Grafana SQLite incompatible with read-only filesystem.
-
-**Fix:** Remove `read_only: true`, keep capability restrictions.
-
-### Prometheus "401 Unauthorized" from Grafana
-
-**Cause:** Missing or incorrect basicAuth in datasource.
-
-**Fix:** Check provisioned datasource has `basicAuthPassword` in `secureJsonData`.
+You should see the groups claim in the OAuth response, confirming that Authentik is sending group membership and Grafana is receiving it.
 
 ---
 
-## Conclusion
+## The 11 Things That Broke
 
-### What You Built
+This is the section that would have saved the most time if it existed before starting this deployment. Every issue below was encountered across the initial build and a subsequent rebuild.
 
-A production-grade monitoring stack:
-- Production-hardened through 6 phases of defense-in-depth
-- Enterprise SSO (Authentik)
-- Secrets management (OpenBAO)
-- Automated operations
-- Compliance ready
+### 1. Django SECRET_KEY Warning (W009)
 
-### Skills Demonstrated
+Authentik logs showed the secret key was too short. Root cause: `openssl rand -base64 32 | tr -dc 'a-zA-Z0-9'` strips enough characters that the output drops below 50. Fix: use `-base64 64` and verify with `wc -c`.
 
-- Multi-VLAN networking
-- OAuth2/OIDC integration
-- PKI certificate management
-- Container security
-- Secrets management
-- TLS configuration
-- Infrastructure-as-code
-- Compliance mapping
+### 2. "Flow Does Not Apply to Current User"
 
-### Next Steps
+The initial setup page denied access. The PostgreSQL volume still had data from a previous installation, and the bootstrap flow only fires against an empty database. Fix: `docker compose down -v` and use an incognito window.
 
-1. Add more exporters (MySQL, Redis, etc.)
-2. Implement Authentik webhooks for real-time session revocation
-3. Migrate to PostgreSQL for Grafana (enable read-only filesystem)
-4. Add SIEM integration for centralized logging
-5. Implement service mesh for mTLS between services
+### 3. Database Lock Hang
+
+Authentik logged "waiting to acquire database lock" and froze. The worker container was holding the migration lock. A simple restart doesn't release it. Fix: full `docker compose down` then `docker compose up -d`.
+
+### 4. Environment Variable Name Mismatch
+
+Authentik couldn't find `POSTGRES_PASSWORD` because the 2025.12 compose file expects `PG_PASS`. This one's entirely a documentation problem -- older guides use the old names, and the error message doesn't suggest the correct variable.
+
+### 5. Prometheus Mount Error
+
+"Are you trying to mount a directory onto a file?" The compose file referenced `./prometheus.yml` but the actual file lived at `./prometheus/prometheus.yml`. Docker silently creates a directory when the source file doesn't exist at the specified path, then throws this error when it tries to mount that directory onto a file target.
+
+### 6. OAuth Button Missing from Grafana Login
+
+The "Sign in with Authentik" button wasn't showing up. Running `docker exec grafana env | grep GF_AUTH` revealed zero OAuth variables, even though the `.env` file was correct. Root cause: `docker compose restart` was used instead of `docker compose up -d --force-recreate`. The restart command reuses the existing container with its original environment.
+
+### 7. Redirect URI Error (Grafana Sends Localhost)
+
+Clicking the OAuth button redirected to Authentik, which rejected the request due to a mismatched redirect URI. Inspecting the browser URL bar during the redirect revealed that Grafana was sending `redirect_uri=http://localhost:3000/...` instead of the actual IP. Fix: set `GF_SERVER_ROOT_URL`.
+
+### 8. TLS Certificate Rejection (x509 IP SAN)
+
+After successful Authentik login, Grafana displayed "Login failed: Failed to get token from provider." Grafana's logs showed: `x509: cannot validate certificate for 192.168.80.54 because it doesn't contain any IP SANs`. Authentik's self-signed cert doesn't include the IP in the SAN field. The browser half of OAuth worked fine; the server-to-server token exchange did not. The initial workaround was `TLS_SKIP_VERIFY_INSECURE=true`. The current approach is using HTTP on port 9000 instead -- not as a shortcut, but because running plaintext on an isolated VLAN exposes the real trust boundaries in the architecture. Proper TLS comes via HAProxy with real PKI certificates once those trust boundaries are understood and documented.
+
+### 9. Client Secret Mismatch (Off by One)
+
+Same symptom as #8: "Failed to get token from provider." But this time TLS wasn't the problem. Running `docker exec grafana env | grep CLIENT_SECRET | cut -d'=' -f2 | tr -d '\n' | wc -c` returned 129 instead of 128. A single trailing character -- probably a newline from the generation process -- was enough to fail the token exchange. Authentik doesn't need a restart after updating the secret in its UI; Grafana does (force-recreate).
+
+### 10. "Sign Up Is Disabled"
+
+The OAuth flow completed, Authentik authenticated the user, but Grafana refused to create the account. `GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=true` controls whether OAuth-authenticated users get auto-provisioned. `GF_USERS_ALLOW_SIGN_UP=false` controls manual registration. You need both set explicitly.
+
+### 11. User Sync Failed (Test Data Pollution)
+
+A new dedicated user couldn't log in: "User sync failed." Grafana's user list showed a conflicting record with the same email address but a different `auth_id`, left over from an earlier test login using the `akadmin` account. OAuth user provisioning uses email + auth_id as a compound identifier, and the stale record blocked the legitimate user. Fix: delete the conflicting user in Grafana's admin UI. Broader lesson: never test OAuth with admin accounts. Always use dedicated test users.
 
 ---
 
-**Published by Oob Skulden™**  
-**"Stay paranoid."**  
-**Complete Journey: Zero → Production-Hardened**  
-**Total Time: ~5-8 hours**  
-**Date: February 4, 2026**
+## What's Deployed and What's Exposed
 
-**Tags:** grafana, authentik, oauth2, openbao, vault, haproxy, tls, docker, container-security, secrets-management, monitoring, prometheus, homelab, cybersecurity, infrastructure-as-code, compliance, nist-800-53, soc2, devops, zero-trust
+The stack is functional. Authentik handles authentication, Grafana serves dashboards with role-based access, Prometheus scrapes metrics from four exporters, and group-based policy enforcement denies access to users outside the permitted groups.
 
-**SEO Keywords:** complete grafana deployment guide, authentik oauth tutorial, openbao secrets management, production monitoring stack, docker security best practices, homelab security hardening, zero to production grafana, container hardening guide, tls certificate automation, compliance monitoring setup
+Now here's what an attacker sees, and why we built it this way first. All traffic is plaintext HTTP across VLANs -- anyone with a packet capture on either segment reads every OAuth token exchange, every Prometheus query, every dashboard session. The OAuth client secret sits in a plaintext `.env` file readable by anyone with shell access to the host. Grafana is directly exposed on port 3000 with no reverse proxy filtering requests. Prometheus and all four exporters are network-accessible with zero authentication -- that's unauthenticated access to host metrics, container metadata, and endpoint probe results. Default Grafana sessions persist indefinitely, so a stolen session cookie works until the server restarts. No container capability dropping, no resource limits, no automated backups, no centralized audit logging.
+
+That's a lot of exposure. That's also what a vanilla deployment of these tools looks like in most environments, except most environments don't write it down. We're going to fix each of these systematically and document why.
+
+The next post walks through these vulnerabilities in detail -- what an attacker can actually reach, what data they can pull, and how each exposure gets exploited in practice -- then covers the hardening steps to close them. That means locking down exposed ports, adding HAProxy for TLS termination, configuring session timeouts, dropping container capabilities, and restricting the monitoring exporters to Docker-internal networks.
+
+OpenBAO gets its own dedicated series. PKI certificate automation, runtime secret injection for OAuth credentials, Prometheus auth token provisioning -- that's a substantial deployment with its own architecture decisions and failure modes. Cramming it into a hardening post would do it a disservice.
+
+---
+
+## Quick Reference
+
+### Authentik Operations
+
+```bash
+cd ~/authentik
+docker compose up -d                    # Start stack
+docker compose down                     # Stop stack (keep volumes)
+docker compose down -v                  # Stop + DESTROY volumes (nuclear option)
+docker compose ps                       # Check container status
+docker compose logs -f server           # Follow server logs
+docker compose logs server | grep SECRET_KEY  # Check for key warnings
+docker exec -it authentik-server ak changepassword akadmin  # Reset admin password
+```
+
+### Grafana Operations
+
+```bash
+cd ~/monitoring
+docker compose up -d                    # Start stack
+docker compose up -d --force-recreate   # Restart with new .env (REQUIRED after changes)
+docker compose ps                       # Check container status
+docker compose logs grafana             # View Grafana logs
+docker exec grafana env | grep GF_AUTH  # Verify OAuth config loaded
+```
+
+### OAuth Debugging Commands
+
+```bash
+# Verify client secret length (must be exactly 128)
+docker exec grafana env | grep CLIENT_SECRET | cut -d'=' -f2 | tr -d '\n' | wc -c
+
+# Test OIDC discovery endpoint
+curl http://192.168.80.54:9000/application/o/grafana/.well-known/openid-configuration | jq
+
+# Watch OAuth flow in real-time
+docker compose logs -f grafana | grep -i 'oauth\|error\|token\|sync'
+
+# Verify root URL is set
+docker exec grafana env | grep ROOT_URL
+
+# Verify OAuth env vars are loaded
+docker exec grafana env | grep GF_AUTH
+
+# Check which containers are on which network
+docker network inspect grafana_network --format '{{range .Containers}}{{.Name}} {{end}}'
+docker network inspect prometheus_network --format '{{range .Containers}}{{.Name}} {{end}}'
+
+# Verify Prometheus scrape targets
+curl -s http://192.168.75.109:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health}'
+```
+
+### Clean Slate
+
+```bash
+# Grafana (destroys all dashboards, users, datasources)
+cd ~/monitoring && docker compose down
+docker volume rm grafana-data
+docker volume create grafana-data
+docker compose up -d
+
+# Authentik (destroys database, all config)
+cd ~/authentik && docker compose down -v
+docker compose up -d
+# Use incognito browser for initial-setup
+```
+
+### File Structure
+
+```
+Authentik-lab (192.168.80.54):
+~/authentik/
++-- .env                    # PG_PASS, AUTHENTIK_SECRET_KEY (chmod 600)
++-- docker-compose.yml      # 2025.12 compose (3 services: server, worker, postgresql)
++-- data/                   # Authentik application data
++-- custom-templates/       # Custom UI templates
++-- certs/                  # TLS certificates (future)
+
+Grafana-lab (192.168.75.109):
+~/monitoring/
++-- .env                    # OAuth config, Grafana admin creds (chmod 600)
++-- docker-compose.yml      # 5-service monitoring stack
++-- prometheus/
+    +-- prometheus.yml      # Scrape configuration (5 jobs)
+```
+
+---
+
+*Published by Oob Skulden� -- Stay Paranoid.*
