@@ -74,6 +74,7 @@ All techniques demonstrated in this post were performed in an isolated personal 
 **URL Verification Date:** February 21, 2026
 
 ---
+{{< youtube vMZ1zIMnkYM >}}
 
 ## Document Structure
 

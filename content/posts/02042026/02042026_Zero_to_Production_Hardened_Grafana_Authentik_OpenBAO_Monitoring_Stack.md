@@ -73,6 +73,8 @@ This post documents the full deployment of an OAuth-authenticated monitoring sta
 
 One deliberate choice up front: this is a vanilla, unsecured deployment. No TLS. No reverse proxy. No secret injection. That's on purpose. If you jump straight to HTTPS and certificate automation, you close off your ability to see what the actual attack surface looks like. You can't defend what you haven't observed. This deployment is about understanding every exposed port, every plaintext credential path, every trust boundary -- so that when we harden it in later phases, we're making informed decisions instead of just ticking boxes.
 
+{{< youtube p6SdjKEMX2E >}}
+
 ---
 
 ## Architecture
