@@ -10,7 +10,7 @@ hidemeta: true
 
 Enterprise-grade security shouldn't require enterprise budgets.
 
-This site focuses on **practical security for small teams** — the kind that works when you're responsible for *everything*, not just one slice of the stack.
+This site focuses on **practical security for homelab builders and small teams** — the kind that works when you're responsible for *everything*, not just one slice of the stack. All techniques are developed and tested in a personal homelab environment. Adapt to your specific context.
 
 The goal: make modern security achievable without excess tooling, process theater, or unrealistic assumptions.
 
@@ -32,7 +32,7 @@ Every article emphasizes:
 - Working detection queries you can copy and adapt
 - Complete remediation paths, not just alerts
 - Honest tool comparisons — including limitations
-- Compliance mappings (NIST, SOC 2, PCI-DSS)
+- Compliance mappings (NIST, SOC 2, PCI-DSS) for educational reference
 - Architectures built on open-source and low-cost tools
 
 ---
@@ -43,7 +43,7 @@ Every article emphasizes:
    Tools are evaluated based on what they do, how they fail, and how they fit into real environments.
 
 2. **No theory without practice**
-   Every recommendation is tested in a live environment.
+   Every recommendation is tested in a live homelab environment before it's published here.
 
 3. **Open-source first, always**
    Cost is treated as a design constraint, not an afterthought.
@@ -61,7 +61,7 @@ I've spent over **20 years across networking, systems administration, database e
 
 I run an extensive homelab where every technique published here is tested first.
 
-All views and content here are my own. This site is not affiliated with, endorsed by, or representative of any employer, past or present.
+*All content on this site represents my own personal educational work, created in a personal capacity. This site is not affiliated with, endorsed by, or representative of any employer, past or present. Content is intended for homelab and educational purposes only. This site does not provide professional security consulting services.*
 
 ---
 
@@ -85,4 +85,4 @@ Articles are backed by homelab experiments, working tools, detection logic, and 
 
 ---
 
-*Oob Skulden™ is a personal educational project. Content is based on publicly available frameworks, open-source tools, and documented best practices. This site does not provide professional consulting services.*
+*Oob Skulden™ is a personal educational project. Content is based on publicly available frameworks, open-source tools, and documented best practices. Compliance framework references (NIST, SOC 2, PCI-DSS) are provided for educational mapping purposes only. This site does not provide professional security consulting services.*
