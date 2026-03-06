@@ -1,10 +1,10 @@
 ---
-title: "The Overlooked Cloud Security Expert"
+title: "Oob Skulden"
 ---
 
 # Security Without the Enterprise Budget
 
-Practical security for home labs. Open source tools. Free tier architectures. Real detection queries. Actual remediation code.
+Practical security for home labbers. Open source tools. Self-hosted architectures. Real detection queries. Actual remediation code.
 
 **No theory. No vendor pitches. Just working solutions.**
 
