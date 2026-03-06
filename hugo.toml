@@ -67,7 +67,7 @@ url = "/about/"
 
 [params.label]
 text = "Oob Skulden"
-subtitle = "Security patterns, failures, and fixes — from the trenches."
+subtitle = "Security patterns, failures, and fixes --- from the trenches."
 icon = "/images/oob.png"
 iconHeight = 60
 
