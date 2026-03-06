@@ -76,7 +76,7 @@ A: Yes. Open WebUI API keys (sk- prefixed) are stored independently in the datab
 
 Let me paint you a picture.
 
-Your company just deployed a self-hosted AI stack. Open WebUI sits behind a login page, protected by Authentik SSO. Your security team did the right things --- they required authentication, they disabled public signup, they even restricted which users can access which models. Someone on the team probably said "this is pretty locked down." 
+You just deployed a self-hosted AI stack. Open WebUI sits behind a login page, protected by Authentik SSO. Your security team did the right things --- they required authentication, they disabled public signup, they even restricted which users can access which models. Someone on the team probably said "this is pretty locked down." 
 
 They weren't wrong about the front door.
 
