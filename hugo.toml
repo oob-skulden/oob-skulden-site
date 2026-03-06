@@ -31,7 +31,7 @@ posts = "/:year/:month/:title/"
 # PaperMod uses this; keep production in Netlify
 env = "production"
 
-description = "Practical cloud security guidance for teams with limited budgets"
+description = "Practical security guidance for home lab enthusiasts"
 author = "Oob Skulden"
 
 ShowReadingTime = true
@@ -48,10 +48,13 @@ ShowSearchPage = true
 enabled = true
 title = "Security Without the Enterprise Budget"
 subtitle = """
-Practical cloud security for small teams.
-Open source tools. Free tier architectures. Real detection queries. Actual remediation code.
+Practical security for home labbers. Open source tools. Self-hosted architectures. Real detection queries. Actual remediation code.
 
 **No theory. Vendor-agnostic. Just working solutions.**
+
+<div style="margin-top:1.2em; padding:0.6em 1.2em; border:1px solid rgba(255,255,255,0.15); border-radius:6px; font-size:0.85em; font-style:italic; opacity:0.7;">
+This content represents personal educational work and does not reflect the views of any employer. All security practices are derived from publicly available frameworks.
+</div>
 """
 
 [[params.profileMode.buttons]]
