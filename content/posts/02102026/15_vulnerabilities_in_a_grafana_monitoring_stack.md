@@ -43,7 +43,7 @@ keywords:
   - oauth token interception
   - docker capability audit
   - monitoring infrastructure attack surface
-showToc: false
+showToc: true
 tocOpen: false
 ShowReadingTime: true
 ShowBreadCrumbs: true

@@ -1,6 +1,6 @@
 ---
 title: "I Broke My Own Identity Provider"
-date: 2026-03-04T12:00:00-05:00
+date: 2026-03-01T12:00:00-05:00
 draft: false
 author: "Oob Skulden™"
 description: "A complete live audit of Authentik 2025.12.3 — every command, every dead end, every lesson. 10 of 15 findings confirmed exploitable including full RCE from a non-superuser account, database compromise, and a two-command path to god-mode. Zero downloaded tools."
@@ -32,7 +32,7 @@ keywords:
   - authentik password policy hardening
   - authentik metrics endpoint authentication
   - authentik blueprint API security
-showToc: false
+showToc: true
 tocOpen: false
 ShowReadingTime: true
 ShowBreadCrumbs: true

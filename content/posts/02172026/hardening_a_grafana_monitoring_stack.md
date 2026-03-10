@@ -30,7 +30,7 @@ keywords:
   - prometheus exposed endpoints
   - grafana rate limiting
   - openbao secrets grafana
-showToc: false
+showToc: true
 tocOpen: false
 ShowReadingTime: true
 ShowBreadCrumbs: true

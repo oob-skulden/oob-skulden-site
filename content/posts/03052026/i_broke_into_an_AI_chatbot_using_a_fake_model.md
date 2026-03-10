@@ -34,7 +34,7 @@ keywords:
   - homelab AI infrastructure audit
   - open webui persistent backdoor API key
   - ollama model poisoning
-showToc: false
+showToc: true
 tocOpen: false
 ShowReadingTime: true
 ShowBreadCrumbs: true

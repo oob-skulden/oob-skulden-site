@@ -43,7 +43,7 @@ keywords:
   - pki certificate management homelab
   - open source siem stack
   - defense in depth monitoring
-showToc: false
+showToc: true
 tocOpen: false
 ShowReadingTime: true
 ShowBreadCrumbs: true
