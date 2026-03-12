@@ -3,7 +3,7 @@ title: "I Hardened a Grafana Stack From \"Please Hack Me\" to Production-Ready. 
 date: 2026-02-15T12:00:00-05:00
 draft: false
 author: "Oob Skulden™"
-description: "A complete live hardening session for a Grafana monitoring stack — every command, every failure, every fix. 15 vulnerabilities across seven categories, from anonymous access and exposed Prometheus endpoints to plaintext secrets and a single browser tab that broke the rate limiter."
+description: "A complete live hardening session for a Grafana monitoring stack  --  every command, every failure, every fix. 15 vulnerabilities across seven categories, from anonymous access and exposed Prometheus endpoints to plaintext secrets and a single browser tab that broke the rate limiter."
 tags:
   - Grafana
   - Prometheus
@@ -40,7 +40,7 @@ ShowShareButtons: false
 
 > *This content was created in my personal capacity using personal equipment and personal time. All techniques are demonstrated in my personal homelab environment. This does not represent the views or practices of any employer.*
 
-> ⚠️ **Lab Environment Only.** All vulnerability demonstrations and hardening techniques in this post are performed on personal homelab infrastructure. Do not attempt these techniques on systems you do not own or have explicit written permission to test.
+>  **Lab Environment Only.** All vulnerability demonstrations and hardening techniques in this post are performed on personal homelab infrastructure. Do not attempt these techniques on systems you do not own or have explicit written permission to test.
 
 ---
 
@@ -48,7 +48,7 @@ Your Grafana instance has a weak password. Your Prometheus is wide open. Your ex
 
 I know this because mine was, too.
 
-This is the complete, unfiltered lab notebook from hardening a Grafana monitoring stack — every command, every output, every failure, and the moment a single browser tab broke my rate limiter. No sanitized tutorial energy here. Just the raw reality of taking a stack from "please hack me" to defense-in-depth across seven vulnerability categories in about six hours.
+This is the complete, unfiltered lab notebook from hardening a Grafana monitoring stack  --  every command, every output, every failure, and the moment a single browser tab broke my rate limiter. No sanitized tutorial energy here. Just the raw reality of taking a stack from "please hack me" to defense-in-depth across seven vulnerability categories in about six hours.
 
 The methodology is dead simple: **one step at a time. Explain. Execute. Validate. Proceed.** That rule got established early, after the very first vulnerability fix went sideways because I tried to combine steps and skip explanations. More on that in a moment.
 
@@ -155,7 +155,7 @@ PROMETHEUS_PASSWORD=<redacted>
 Let me count the ways this was broken:
 
 - Admin password: trivially guessable
-- No TLS — everything plaintext HTTP
+- No TLS  --  everything plaintext HTTP
 - Prometheus: no auth, exposed on `0.0.0.0:9090`
 - Grafana: exposed on `0.0.0.0:3000`
 - All exporters: exposed on `0.0.0.0` (ports 9100, 8080, 9115)
@@ -193,7 +193,7 @@ Output: `<redacted>`
 
 **Change the live Grafana admin password via the API:**
 
-This is a subtlety that trips people up. Grafana stores its password in its SQLite database, not the `.env` file. The `.env` entry is only for future container rebuilds. We hit the API first because it needs the *current* password to authenticate — if we update `.env` and recreate the container first, we could get a mismatch.
+This is a subtlety that trips people up. Grafana stores its password in its SQLite database, not the `.env` file. The `.env` entry is only for future container rebuilds. We hit the API first because it needs the *current* password to authenticate  --  if we update `.env` and recreate the container first, we could get a mismatch.
 
 ```bash
 curl -s -X PUT -u admin:<redacted> -H "Content-Type: application/json" \
@@ -209,7 +209,7 @@ Output: `{"message":"User password changed"}`
 curl -s -o /dev/null -w "%{http_code}" -u admin:<redacted> http://127.0.0.1:3000/api/org
 ```
 
-Output: `401` — dead.
+Output: `401`  --  dead.
 
 **Verify the new password works:**
 
@@ -217,7 +217,7 @@ Output: `401` — dead.
 curl -s -o /dev/null -w "%{http_code}" -u admin:<redacted> http://127.0.0.1:3000/api/org
 ```
 
-Output: `200` — we're in.
+Output: `200`  --  we're in.
 
 **Update the `.env` file:**
 
@@ -233,7 +233,7 @@ The `|` delimiter instead of `/` avoids issues if passwords contain slashes. Sma
 ls -la ~/monitoring/.env
 ```
 
-Output: `-rw------- 1 oob oob 899 Mar 1 14:52 .env` — still 600.
+Output: `-rw------- 1 oob oob 899 Mar 1 14:52 .env`  --  still 600.
 
 **Check for rogue service accounts** created during the "Break It" phase:
 
@@ -269,7 +269,7 @@ Output: `401`
 
 ## Chapter 2: TLS Encryption with HAProxy (VULN-10)
 
-All traffic to Grafana was unencrypted HTTP. Credentials, session tokens, dashboard data — everything transmitted in plaintext. Anyone on the network could capture it with Wireshark.
+All traffic to Grafana was unencrypted HTTP. Credentials, session tokens, dashboard data  --  everything transmitted in plaintext. Anyone on the network could capture it with Wireshark.
 
 **Backup first** (always):
 
@@ -299,10 +299,10 @@ sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 ```
 
 Quick breakdown of the flags:
-- `-x509` — self-signed certificate, not a CSR
-- `-nodes` — don't encrypt the private key (HAProxy needs to read it without prompting)
-- `-days 365` — one year validity
-- `-newkey rsa:2048` — fresh 2048-bit RSA key
+- `-x509`  --  self-signed certificate, not a CSR
+- `-nodes`  --  don't encrypt the private key (HAProxy needs to read it without prompting)
+- `-days 365`  --  one year validity
+- `-newkey rsa:2048`  --  fresh 2048-bit RSA key
 
 This is temporary. Later it gets replaced with a proper certificate from OpenBAO's PKI engine.
 
@@ -378,12 +378,12 @@ EOF
 
 The security headers deserve a moment:
 
-- **HSTS** — tells browsers to always use HTTPS
-- **X-Frame-Options DENY** — prevents iframe embedding (clickjacking defense)
-- **X-Content-Type-Options** — prevents MIME sniffing attacks
-- **X-XSS-Protection** — enables the browser's XSS filter
-- **Referrer-Policy** — controls what URL info leaks on external links
-- **CSP** — restricts what scripts and resources the page can load
+- **HSTS**  --  tells browsers to always use HTTPS
+- **X-Frame-Options DENY**  --  prevents iframe embedding (clickjacking defense)
+- **X-Content-Type-Options**  --  prevents MIME sniffing attacks
+- **X-XSS-Protection**  --  enables the browser's XSS filter
+- **Referrer-Policy**  --  controls what URL info leaks on external links
+- **CSP**  --  restricts what scripts and resources the page can load
 
 **Validate and start:**
 
@@ -392,7 +392,7 @@ sudo /usr/sbin/haproxy -c -f /etc/haproxy/haproxy.cfg
 sudo systemctl start haproxy && sudo systemctl status haproxy
 ```
 
-Output: `Active: active (running)` — three ports listening: `*:80` (redirect), `*:443` (HTTPS), `127.0.0.1:8404` (stats, localhost only).
+Output: `Active: active (running)`  --  three ports listening: `*:80` (redirect), `*:443` (HTTPS), `127.0.0.1:8404` (stats, localhost only).
 
 [![HAProxy traffic flow showing TLS termination, localhost binding, and rate limiting lesson](/images/ep3-haproxy-flow.jpg)](/images/ep3-haproxy-flow.jpg)
 
@@ -406,7 +406,7 @@ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1/
 # 301
 ```
 
-The `-k` flag is critical here — without it, curl rejects self-signed certificates and returns `000`, making you think the service is down. Ask me how I know.
+The `-k` flag is critical here  --  without it, curl rejects self-signed certificates and returns `000`, making you think the service is down. Ask me how I know.
 
 ### The Bypass Problem
 
@@ -421,7 +421,7 @@ curl -s -o /dev/null -w "%{http_code}" http://192.168.75.109:3000/login
 
 All that TLS work, and you could just... go around it.
 
-**The fix — bind Grafana to localhost only:**
+**The fix  --  bind Grafana to localhost only:**
 
 In `docker-compose.yml`, changed:
 
@@ -467,7 +467,7 @@ curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://192.168.75.109
 
 ## Chapter 3: Prometheus Authentication (VULN-02)
 
-Prometheus was wide open on port 9090 with no authentication. Anyone on the network could query the entire infrastructure topology — container names, IP addresses, resource metrics, job configurations — without credentials. It's an attacker's reconnaissance dream.
+Prometheus was wide open on port 9090 with no authentication. Anyone on the network could query the entire infrastructure topology  --  container names, IP addresses, resource metrics, job configurations  --  without credentials. It's an attacker's reconnaissance dream.
 
 **Install htpasswd and generate credentials:**
 
@@ -477,7 +477,7 @@ sudo apt install -y apache2-utils
 openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 24 && echo
 ```
 
-Output: `<redacted>` — 24 characters (shorter than Grafana's 32, this is machine-to-machine).
+Output: `<redacted>`  --  24 characters (shorter than Grafana's 32, this is machine-to-machine).
 
 **Generate the bcrypt hash:**
 
@@ -506,7 +506,7 @@ EOF
 
 **Critical: Set permissions to 644, NOT 600.**
 
-Here's a gotcha that will eat an hour of your life. Prometheus runs as user `nobody` (UID 65534) inside the container. With `600`, only the file owner can read it — `nobody` gets "permission denied" and Prometheus won't start.
+Here's a gotcha that will eat an hour of your life. Prometheus runs as user `nobody` (UID 65534) inside the container. With `600`, only the file owner can read it  --  `nobody` gets "permission denied" and Prometheus won't start.
 
 644 is acceptable because the file contains a bcrypt hash, not the password. Even if someone reads the hash, they can't reverse it.
 
@@ -591,7 +591,7 @@ curl -s -u admin:<redacted> \
   http://127.0.0.1:3000/api/datasources | python3 -m json.tool
 ```
 
-Single datasource with `basicAuth: true`, `readOnly: true`. No duplicates. This matters — duplicate datasources without `basicAuth` configured will trigger browser `WWW-Authenticate` popups that make you think authentication is broken when it isn't.
+Single datasource with `basicAuth: true`, `readOnly: true`. No duplicates. This matters  --  duplicate datasources without `basicAuth` configured will trigger browser `WWW-Authenticate` popups that make you think authentication is broken when it isn't.
 
 **VULN-02: FIXED.**
 
@@ -615,7 +615,7 @@ sudo docker inspect grafana --format 'Memory: {{.HostConfig.Memory}} CPU: {{.Hos
 
 No capabilities dropped. No resource limits. Wide open.
 
-**Full rewrite of docker-compose.yml** (using `cat` instead of `sed` because `sed` causes YAML corruption — learned that the hard way in Phase 5):
+**Full rewrite of docker-compose.yml** (using `cat` instead of `sed` because `sed` causes YAML corruption  --  learned that the hard way in Phase 5):
 
 ```bash
 cat > ~/monitoring/docker-compose.yml << 'EOF'
@@ -698,12 +698,12 @@ EOF
 
 What's new in the Grafana service:
 
-- **`no-new-privileges`** — prevents privilege escalation via setuid binaries
-- **`cap_drop: ALL`** — removes all ~35 Linux capabilities
-- **`cap_add`** — adds back only the 4 Grafana actually needs: `CHOWN` (change file ownership during startup), `SETGID`/`SETUID` (switch to the grafana user), `DAC_OVERRIDE` (critical for SQLite writes)
-- **`deploy: resources`** — limits to 1 CPU and 512MB, reserves 0.25 CPU and 128MB
+- **`no-new-privileges`**  --  prevents privilege escalation via setuid binaries
+- **`cap_drop: ALL`**  --  removes all ~35 Linux capabilities
+- **`cap_add`**  --  adds back only the 4 Grafana actually needs: `CHOWN` (change file ownership during startup), `SETGID`/`SETUID` (switch to the grafana user), `DAC_OVERRIDE` (critical for SQLite writes)
+- **`deploy: resources`**  --  limits to 1 CPU and 512MB, reserves 0.25 CPU and 128MB
 
-That `DAC_OVERRIDE` capability is a gotcha worth emphasizing: drop it, and Grafana enters a crash loop with "attempt to write a readonly database." The Grafana container's SQLite architecture requires it. Don't try `read_only: true` on the filesystem either — same crash, same reason.
+That `DAC_OVERRIDE` capability is a gotcha worth emphasizing: drop it, and Grafana enters a crash loop with "attempt to write a readonly database." The Grafana container's SQLite architecture requires it. Don't try `read_only: true` on the filesystem either  --  same crash, same reason.
 
 **Validate and deploy:**
 
@@ -744,9 +744,9 @@ sudo docker inspect grafana --format 'Memory: {{.HostConfig.Memory}} CPU: {{.Hos
 
 Three exporters were broadcasting to anyone who asked:
 
-- **Node Exporter** (9100) — host OS details, CPU, memory, disk, network
-- **cAdvisor** (8080) — container configs, environment variables, resource usage
-- **Blackbox Exporter** (9115) — SSRF attack vector across VLANs
+- **Node Exporter** (9100)  --  host OS details, CPU, memory, disk, network
+- **cAdvisor** (8080)  --  container configs, environment variables, resource usage
+- **Blackbox Exporter** (9115)  --  SSRF attack vector across VLANs
 
 **Prove the problem exists** (from the jump box):
 
@@ -779,7 +779,7 @@ curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://192.168.75.109
 curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://192.168.75.109:9115/metrics  # 000
 ```
 
-All three dead from the network. `docker ps` confirms — exporters show their container port but no `0.0.0.0:` prefix. Not published to the host.
+All three dead from the network. `docker ps` confirms  --  exporters show their container port but no `0.0.0.0:` prefix. Not published to the host.
 
 ### The Self-Scrape Surprise
 
@@ -802,7 +802,7 @@ Four up. One down. Prometheus can't scrape *itself*.
 
 The `prometheus` job in `prometheus.yml` was scraping `localhost:9090` but didn't include basic auth credentials. After we added authentication in VULN-02, Prometheus needs credentials to scrape its own metrics endpoint. It was authenticating everyone else out, including itself.
 
-**Fix — rewrite prometheus.yml with self-scrape auth:**
+**Fix  --  rewrite prometheus.yml with self-scrape auth:**
 
 ```bash
 cp ~/monitoring/prometheus/prometheus.yml ~/monitoring/prometheus/prometheus.yml.backup.$(date +%Y%m%d-%H%M%S)
@@ -888,11 +888,11 @@ EOF
 ```
 
 What each one does:
-- `INACTIVE_LIFETIME=1h` — idle sessions expire after 1 hour
-- `MAXIMUM_LIFETIME=24h` — no session lasts longer than 24 hours, period
-- `TOKEN_ROTATION=10` — session token changes every 10 minutes, limiting the window if a token is stolen
+- `INACTIVE_LIFETIME=1h`  --  idle sessions expire after 1 hour
+- `MAXIMUM_LIFETIME=24h`  --  no session lasts longer than 24 hours, period
+- `TOKEN_ROTATION=10`  --  session token changes every 10 minutes, limiting the window if a token is stolen
 
-**Recreate Grafana** (not `restart` — `restart` won't read new environment variables):
+**Recreate Grafana** (not `restart`  --  `restart` won't read new environment variables):
 
 ```bash
 cd ~/monitoring && sudo docker compose up -d --force-recreate grafana
@@ -918,7 +918,7 @@ All three loaded.
 
 ---
 
-## Chapter 7: Rate Limiting — The Easy Part, Then The Hard Part
+## Chapter 7: Rate Limiting  --  The Easy Part, Then The Hard Part
 
 ### The Implementation
 
@@ -950,7 +950,7 @@ And everything broke.
 
 Opening `https://192.168.75.109/login` from an actual browser immediately triggered 429 errors. The page couldn't load.
 
-**Root cause — from the HAProxy logs:**
+**Root cause  --  from the HAProxy logs:**
 
 ```bash
 sudo journalctl -u haproxy --no-pager -n 50
@@ -958,11 +958,11 @@ sudo journalctl -u haproxy --no-pager -n 50
 
 The logs told the story immediately. Within 2 seconds of loading the page, the browser fired off requests for CSS files, JavaScript bundles, fonts, SVG icons, API calls, plugin settings, and websocket connections. A single Grafana page load generates **40+ requests in under 2 seconds**. By request 21, HAProxy started rejecting JavaScript bundles, fonts, API calls, and even the favicon.
 
-The log lines with `<NOSRV>` and status `429` — HAProxy rejected the request without even forwarding it to Grafana. The `PR--` flag on those lines means "denied by protection rule."
+The log lines with `<NOSRV>` and status `429`  --  HAProxy rejected the request without even forwarding it to Grafana. The `PR--` flag on those lines means "denied by protection rule."
 
 ### Why `curl` Didn't Catch This
 
-Each `curl` is a single HTTP request. A browser loading Grafana's login page requests the HTML, then parses it and fetches every linked resource — JS bundles, CSS files, fonts, images, API endpoints — all in parallel. A real browser behaves *fundamentally differently* from `curl`.
+Each `curl` is a single HTTP request. A browser loading Grafana's login page requests the HTML, then parses it and fetches every linked resource  --  JS bundles, CSS files, fonts, images, API endpoints  --  all in parallel. A real browser behaves *fundamentally differently* from `curl`.
 
 This is the most expensive lesson in the entire project: **always test security controls with the actual client, not just CLI tools.**
 
@@ -973,11 +973,11 @@ sudo sed -i 's/sc_http_req_rate(0) gt 20/sc_http_req_rate(0) gt 100/' /etc/hapro
 sudo /usr/sbin/haproxy -c -f /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy
 ```
 
-Note: `systemctl reload` over `restart` — reload applies config without dropping existing connections. Safer for production.
+Note: `systemctl reload` over `restart`  --  reload applies config without dropping existing connections. Safer for production.
 
 100 requests per 10 seconds (600/minute) accommodates legitimate browser behavior including OAuth flows, while still blocking automated brute-force tools that generate thousands of requests per minute.
 
-**After the fix** — loaded Grafana in the browser, checked logs:
+**After the fix**  --  loaded Grafana in the browser, checked logs:
 
 ```
 Mar 03 14:39:21 ... 200 ... "GET .../public/build/6029.bdcbf27bcdd36812f646.js HTTP/2.0"
@@ -992,7 +992,7 @@ Mar 03 14:39:23 ... 200 ... "GET .../api/search?limit=30&type=dash-db HTTP/2.0"
 
 ---
 
-## Chapter 8: OpenBAO Secrets — Getting There Is Half the Battle
+## Chapter 8: OpenBAO Secrets  --  Getting There Is Half the Battle
 
 [![OpenBAO secret injection pipeline from encrypted vault through entrypoint.sh to running Grafana](/images/ep3-secret-pipeline.jpg)](/images/ep3-secret-pipeline.jpg)
 
@@ -1011,17 +1011,17 @@ curl -sk -o /dev/null -w "%{http_code}" https://192.168.100.182/v1/sys/health
 # 200
 ```
 
-OpenBAO's container listens on port 8200, but HAProxy on the OpenBAO host terminates TLS on port 443 and proxies to 8200. The external address is `https://192.168.100.182` — no port suffix. Took three tries to figure that out.
+OpenBAO's container listens on port 8200, but HAProxy on the OpenBAO host terminates TLS on port 443 and proxies to 8200. The external address is `https://192.168.100.182`  --  no port suffix. Took three tries to figure that out.
 
 This distinction matters:
-- **Inside the OpenBAO container** (admin CLI work): `http://127.0.0.1:8200` — direct, no HAProxy
-- **From Grafana-lab** (entrypoint script): `https://192.168.100.182` — through HAProxy, with TLS
+- **Inside the OpenBAO container** (admin CLI work): `http://127.0.0.1:8200`  --  direct, no HAProxy
+- **From Grafana-lab** (entrypoint script): `https://192.168.100.182`  --  through HAProxy, with TLS
 
 Know your own infrastructure's network path. This is a common gotcha when services sit behind reverse proxies.
 
 ---
 
-## Chapter 9: OpenBAO Configuration — Secrets, Policies, and AppRole
+## Chapter 9: OpenBAO Configuration  --  Secrets, Policies, and AppRole
 
 Everything from here happens *inside the OpenBAO container*:
 
@@ -1068,7 +1068,7 @@ EOF
 
 This creates a policy that allows read access to anything under `secret/data/grafana/` and nothing else. The `/data/` in the path is mandatory for KV v2. The CLI abstracts this away when you type `bao kv get secret/grafana/credentials`, but policies and direct API calls need the full v2 path. This trips up everyone at least once.
 
-**Why not use the root token from Grafana?** Because if the Grafana container were compromised, the attacker would have full access to *everything* — all secrets, PKI infrastructure, system configuration. The scoped policy ensures Grafana can only read its own secrets. Least privilege isn't optional.
+**Why not use the root token from Grafana?** Because if the Grafana container were compromised, the attacker would have full access to *everything*  --  all secrets, PKI infrastructure, system configuration. The scoped policy ensures Grafana can only read its own secrets. Least privilege isn't optional.
 
 **Create the AppRole:**
 
@@ -1112,9 +1112,9 @@ All three secrets readable. Machine identity is working.
 
 ---
 
-## Chapter 10: The Entrypoint Script — The python3 Disaster
+## Chapter 10: The Entrypoint Script  --  The python3 Disaster
 
-The plan: create `~/monitoring/entrypoint.sh` — a script that runs at container startup, before Grafana launches. It authenticates to OpenBAO, fetches all three secrets, injects them into the environment, and launches Grafana.
+The plan: create `~/monitoring/entrypoint.sh`  --  a script that runs at container startup, before Grafana launches. It authenticates to OpenBAO, fetches all three secrets, injects them into the environment, and launches Grafana.
 
 ### Version 1 (Broken)
 
@@ -1156,7 +1156,7 @@ The script was written and tested conceptually on the Debian host, where `python
 
 ---
 
-## Chapter 11: The Entrypoint Script — The Working Version
+## Chapter 11: The Entrypoint Script  --  The Working Version
 
 Rewrote all JSON parsing to use `sed`:
 
@@ -1195,12 +1195,12 @@ exec env \
 
 Each `sed` command pair does two operations:
 
-1. `sed 's/.*"client_token":"//'` — strips everything from the start of the string up to and including `"client_token":"`, leaving the token value and everything after it
-2. `sed 's/".*//'` — strips the closing quote and everything after it, leaving just the token value
+1. `sed 's/.*"client_token":"//'`  --  strips everything from the start of the string up to and including `"client_token":"`, leaving the token value and everything after it
+2. `sed 's/".*//'`  --  strips the closing quote and everything after it, leaving just the token value
 
 Not a proper JSON parser. But it works reliably when the JSON structure is known and consistent, which OpenBAO's API responses are.
 
-### The `exec env` Pattern — This Is the Critical Part
+### The `exec env` Pattern  --  This Is the Critical Part
 
 ```bash
 exec env \
@@ -1214,7 +1214,7 @@ exec env \
 
 Why not just use `export`? Because `exec` destroys the current shell when it launches the new process. Variables set with `export` are lost at that boundary. `exec env` sets the variables and launches the process simultaneously, ensuring they survive.
 
-**This pattern is mandatory for Docker entrypoint scripts that inject secrets.** Simple `export` does not persist through `exec`. This is a non-obvious Docker behavior that causes silent failures — the container starts, but the variables are empty, leading to authentication failures that look like configuration problems rather than what they actually are.
+**This pattern is mandatory for Docker entrypoint scripts that inject secrets.** Simple `export` does not persist through `exec`. This is a non-obvious Docker behavior that causes silent failures  --  the container starts, but the variables are empty, leading to authentication failures that look like configuration problems rather than what they actually are.
 
 ### Deploy
 
@@ -1227,7 +1227,7 @@ After 60 seconds:
 
 ```bash
 docker ps | grep grafana
-# Up 3 minutes — no restart loop
+# Up 3 minutes  --  no restart loop
 ```
 
 ---
@@ -1238,11 +1238,11 @@ During development, a question came up: "Will the output show up in logs or memo
 
 Honest answer: secrets exist in several places during the container lifecycle.
 
-1. **Shell variables during startup** — brief, in process memory, gone once `exec` replaces the shell
-2. **Docker logs** — output is captured by shell variable assignment (`SECRETS=$(...)`), won't appear in logs unless the script errors out
-3. **Process memory** — during the narrow startup window, theoretically visible in `/proc` to root
-4. **Docker environment** — after startup, `docker inspect` and `docker exec grafana env` will show them (same exposure as the `.env` file)
-5. **Grafana logs** — Grafana masks the admin password: `GF_SECURITY_ADMIN_PASSWORD=*********`
+1. **Shell variables during startup**  --  brief, in process memory, gone once `exec` replaces the shell
+2. **Docker logs**  --  output is captured by shell variable assignment (`SECRETS=$(...)`), won't appear in logs unless the script errors out
+3. **Process memory**  --  during the narrow startup window, theoretically visible in `/proc` to root
+4. **Docker environment**  --  after startup, `docker inspect` and `docker exec grafana env` will show them (same exposure as the `.env` file)
+5. **Grafana logs**  --  Grafana masks the admin password: `GF_SECURITY_ADMIN_PASSWORD=*********`
 
 **What improved:** The `.env` file no longer contains passwords. It contains only AppRole credentials (`role_id` and `secret_id`) that are scoped to read-only access to Grafana's secrets. The actual secrets are encrypted at rest in OpenBAO. They're fetched fresh every container start. If the `.env` file is compromised, the attacker gets AppRole credentials, not root access to the vault.
 
@@ -1254,7 +1254,7 @@ Secrets management is about *reducing* the attack surface, not eliminating it. M
 
 ## Chapter 13: The Final `.env` and Docker Compose
 
-### `.env` — Before and After
+### `.env`  --  Before and After
 
 **Before (3 plaintext secrets):**
 
@@ -1288,7 +1288,7 @@ BAO_SECRET_ID=<redacted>
 
 Three secrets removed. Two AppRole credentials added. File permissions remain 600.
 
-### Docker Compose — Two Lines Added to Grafana
+### Docker Compose  --  Two Lines Added to Grafana
 
 ```yaml
 volumes:
@@ -1300,7 +1300,7 @@ The `:ro` flag prevents any in-container modification. The `entrypoint` directiv
 
 ---
 
-## Chapter 14: Final Validation — End to End
+## Chapter 14: Final Validation  --  End to End
 
 **Container stability:**
 
@@ -1519,7 +1519,7 @@ Both present. External snapshots are dead.
 
 This is where things got weird.
 
-During UI testing of the snapshot security changes, a native browser popup appeared: `Sign in to access this site` / `Authorization required by https://192.168.75.84`. This wasn't Grafana's login page. This was the browser's own credential dialog — the one you see when a server sends a `WWW-Authenticate: Basic` header.
+During UI testing of the snapshot security changes, a native browser popup appeared: `Sign in to access this site` / `Authorization required by https://192.168.75.84`. This wasn't Grafana's login page. This was the browser's own credential dialog  --  the one you see when a server sends a `WWW-Authenticate: Basic` header.
 
 It appeared on every dashboard page, even after successfully logging in through OAuth via Authentik. The Grafana sidebar loaded fine. The dashboard structure rendered. Then the popup appeared over the content. Clicking "Cancel" dismissed it, but dashboard panels showed no data.
 
@@ -1531,7 +1531,7 @@ So what's sending a `WWW-Authenticate` header?
 
 ### The Diagnostic Chain
 
-**Step 1 — Rule out HAProxy basic auth:**
+**Step 1  --  Rule out HAProxy basic auth:**
 
 ```bash
 sudo grep -A 5 "userlist" /etc/haproxy/haproxy.cfg
@@ -1544,11 +1544,11 @@ sudo cat /etc/haproxy/haproxy.cfg
 
 No `userlist`, no `http-request auth`, no basic auth directives anywhere. HAProxy only performs TLS termination, security headers, rate limiting, and proxying. Eliminated as the source.
 
-**Step 2 — Rule out cached browser credentials:**
+**Step 2  --  Rule out cached browser credentials:**
 
 Tested in fresh incognito window. Logged in as `akadmin` via OAuth. Same behavior. Not a cache issue and not a role/permission issue.
 
-**Step 3 — Verify Prometheus credentials in the Grafana container:**
+**Step 3  --  Verify Prometheus credentials in the Grafana container:**
 
 ```bash
 sudo docker exec grafana env | grep PROMETHEUS
@@ -1557,7 +1557,7 @@ sudo docker exec grafana env | grep PROMETHEUS
 
 Password present and correct.
 
-**Step 4 — Test Prometheus connectivity from inside the Grafana container:**
+**Step 4  --  Test Prometheus connectivity from inside the Grafana container:**
 
 ```bash
 sudo docker exec grafana curl -s -u prometheus:<redacted> \
@@ -1570,7 +1570,7 @@ sudo docker exec grafana curl -s -u prometheus:<redacted> \
 
 Authentication works correctly from inside the container. (Side note: BusyBox `wget` on Alpine doesn't support `--user` or `--password` flags. Use `curl -u` instead.)
 
-**Step 4b — Verify datasource provisioning configuration:**
+**Step 4b  --  Verify datasource provisioning configuration:**
 
 ```bash
 cat ~/monitoring/grafana/provisioning/datasources/prometheus.yml
@@ -1578,7 +1578,7 @@ cat ~/monitoring/grafana/provisioning/datasources/prometheus.yml
 
 Confirmed: `access: proxy`, `basicAuth: true`, `basicAuthUser: prometheus`, `secureJsonData.basicAuthPassword: ${PROMETHEUS_PASSWORD}`. The provisioning file is correct.
 
-**Step 5 — List all datasources:**
+**Step 5  --  List all datasources:**
 
 ```bash
 source ~/monitoring/.env
@@ -1624,16 +1624,16 @@ And there it was:
 The chain of events:
 
 1. Grafana proxies Prometheus queries server-side (due to `access: proxy`)
-2. The provisioned datasource (id: 2) includes basic auth credentials — works fine
-3. The old manual datasource (id: 1) has `basicAuth: false` — no credentials sent
+2. The provisioned datasource (id: 2) includes basic auth credentials  --  works fine
+3. The old manual datasource (id: 1) has `basicAuth: false`  --  no credentials sent
 4. When any dashboard panel references the old datasource, Prometheus returns `401 Unauthorized` with a `WWW-Authenticate: Basic` header
 5. Grafana passes this `WWW-Authenticate` header through to the browser response
 6. The browser interprets this as a prompt for user credentials and shows the native auth dialog
 7. Even if no dashboard *explicitly* references the old datasource, Grafana's internal query routing or variable resolution can trigger queries against it
 
-This is insidious. The popup looks like HAProxy or Grafana auth — not obviously a datasource issue. The provisioned datasource works fine. Only the hidden duplicate causes problems. And it was never cleaned up because provisioning creates a *new* datasource alongside existing ones — it doesn't replace or remove them.
+This is insidious. The popup looks like HAProxy or Grafana auth  --  not obviously a datasource issue. The provisioned datasource works fine. Only the hidden duplicate causes problems. And it was never cleaned up because provisioning creates a *new* datasource alongside existing ones  --  it doesn't replace or remove them.
 
-### The Fix — Delete the Duplicate
+### The Fix  --  Delete the Duplicate
 
 ```bash
 source ~/monitoring/.env
@@ -1667,7 +1667,7 @@ Single entry. Clean.
 
 ---
 
-## Chapter 17: "No Data" — The Orphaned Dashboard (Phase 6.2)
+## Chapter 17: "No Data"  --  The Orphaned Dashboard (Phase 6.2)
 
 The duplicate datasource was dead. The browser popup was gone. Everything seemed fine.
 
@@ -1728,7 +1728,7 @@ curl -s -u prometheus:<redacted> \
 }
 ```
 
-`vault_core_unsealed = 1` — OpenBAO is unsealed and healthy. The data pipeline (OpenBAO to Prometheus to Grafana) is working perfectly.
+`vault_core_unsealed = 1`  --  OpenBAO is unsealed and healthy. The data pipeline (OpenBAO to Prometheus to Grafana) is working perfectly.
 
 The issue is at the Grafana dashboard/panel level.
 
@@ -1736,7 +1736,7 @@ The issue is at the Grafana dashboard/panel level.
 
 Before getting to the real root cause, there was a brief detour where Prometheus auth itself seemed broken.
 
-**First attempt — unauthenticated request (failed):**
+**First attempt  --  unauthenticated request (failed):**
 
 ```bash
 sudo docker exec prometheus wget -qO- 'http://localhost:9090/api/v1/targets' 2>/dev/null | python3 -m json.tool | grep -A 5 "openbao"
@@ -1748,7 +1748,7 @@ Expecting value: line 1 column 1 (char 0)
 
 Prometheus has basic auth now. Unauthenticated requests return garbage.
 
-**Second attempt — wrong username (failed):**
+**Second attempt  --  wrong username (failed):**
 
 ```bash
 curl -s -u admin:<redacted> \
@@ -1784,7 +1784,7 @@ basic_auth_users:
   prometheus: $2y$10$...
 ```
 
-Username is `prometheus`, not `admin`. Configured back in Phase 3. Two things to verify when auth fails — the username AND the variable name. Don't assume either. Check the actual config files.
+Username is `prometheus`, not `admin`. Configured back in Phase 3. Two things to verify when auth fails  --  the username AND the variable name. Don't assume either. Check the actual config files.
 
 Also worth noting: the first attempt used `$PROMETHEUS_ADMIN_PASSWORD` which doesn't exist in `.env`. The actual variable is `PROMETHEUS_PASSWORD`:
 
@@ -1793,7 +1793,7 @@ grep -i prom ~/monitoring/.env
 # PROMETHEUS_PASSWORD=<redacted>
 ```
 
-### The Actual Root Cause — Orphaned UIDs
+### The Actual Root Cause  --  Orphaned UIDs
 
 **Get the dashboard UID:**
 
@@ -1869,9 +1869,9 @@ sudo docker exec grafana curl -s -u admin:<redacted> \
 | Actual datasource UID | `PBFA97CFB590B2093` |
 | Status of `cfb1rlaq8gutcf` | **DELETED** (in Phase 6.3) |
 
-There it is. Dashboard panels store datasource references by UID, not by name. When we deleted the duplicate datasource to fix the browser popup, every panel on the OpenBAO dashboard became an orphan. Grafana doesn't show an error for this — it just says "No data." Which is ambiguous as hell, because it could mean no metrics exist, wrong time range, or broken datasource reference. There's no "hey, the datasource this panel is pointing at doesn't exist anymore" warning.
+There it is. Dashboard panels store datasource references by UID, not by name. When we deleted the duplicate datasource to fix the browser popup, every panel on the OpenBAO dashboard became an orphan. Grafana doesn't show an error for this  --  it just says "No data." Which is ambiguous as hell, because it could mean no metrics exist, wrong time range, or broken datasource reference. There's no "hey, the datasource this panel is pointing at doesn't exist anymore" warning.
 
-### The Fix — Bulk UID Replacement via API
+### The Fix  --  Bulk UID Replacement via API
 
 16 panels needed their datasource UID updated. Clicking through each one in the UI? No. We're using the API.
 
@@ -1904,7 +1904,7 @@ print(json.dumps(payload))
 
 ### The stdin Piping Failure
 
-**First attempt — pipe the file into docker exec (failed):**
+**First attempt  --  pipe the file into docker exec (failed):**
 
 ```bash
 sudo docker exec grafana curl -s -X POST \
@@ -1921,7 +1921,7 @@ sudo docker exec grafana curl -s -X POST \
 
 Piping file content from the host via stdin (`< /tmp/file`) into `docker exec` doesn't reliably pass the data through to the `curl -d @-` process inside the container. The stdin redirection applies to `docker exec`, but the data doesn't reach the subprocess correctly. This is a known Docker limitation with complex stdin piping.
 
-### The Working Approach — docker cp First
+### The Working Approach  --  docker cp First
 
 **Copy the file into the container:**
 
@@ -1973,15 +1973,15 @@ for panel in data.get('dashboard', {}).get('panels', []):
 "
 ```
 
-All 16 panels now show `uid=PBFA97CFB590B2093`. Opened the dashboard in the browser — every panel populated with live data.
+All 16 panels now show `uid=PBFA97CFB590B2093`. Opened the dashboard in the browser  --  every panel populated with live data.
 
 ### Why This Matters
 
-This entire chain — duplicate datasource causing browser popups, deleting it to fix the popup, orphaning 16 dashboard panels, then bulk-fixing them via the API — is what real-world incremental hardening looks like. In a production environment, you rarely get a clean-room deployment. You inherit drift, manual changes, and layered configurations.
+This entire chain  --  duplicate datasource causing browser popups, deleting it to fix the popup, orphaning 16 dashboard panels, then bulk-fixing them via the API  --  is what real-world incremental hardening looks like. In a production environment, you rarely get a clean-room deployment. You inherit drift, manual changes, and layered configurations.
 
 The duplicate datasource existed because Prometheus auth was added incrementally (Phase 3) without cleaning up the manually-created datasource from before auth existed. Provisioning creates *new* resources. It does not replace or remove existing ones.
 
-The "No data" symptom is dangerously ambiguous — it could mean no metrics exist, wrong time range, wrong query, or broken datasource reference. Before deleting any datasource, query all dashboards to check for references.
+The "No data" symptom is dangerously ambiguous  --  it could mean no metrics exist, wrong time range, wrong query, or broken datasource reference. Before deleting any datasource, query all dashboards to check for references.
 
 And when you need to fix 16 panels? API-based bulk replacement is faster, safer, and reproducible compared to clicking through each panel in the UI.
 
@@ -2088,33 +2088,33 @@ Key fields captured: `remote_addr` (source IP for forensics), `uname` (authentic
 
 Write these down. Tattoo them somewhere. They'll save you hours.
 
-1. **`exec env` is mandatory** — `entrypoint.sh` must use `exec env VAR=value /run.sh` to pass dynamically-retrieved secrets to Grafana. Simple `export` doesn't persist through `exec`.
+1. **`exec env` is mandatory**  --  `entrypoint.sh` must use `exec env VAR=value /run.sh` to pass dynamically-retrieved secrets to Grafana. Simple `export` doesn't persist through `exec`.
 
-2. **Alpine has no python3** — The Grafana container is Alpine-based. Don't use `python3`, `jq`, or anything not in the base image. Use `sed`, `grep`, and shell builtins.
+2. **Alpine has no python3**  --  The Grafana container is Alpine-based. Don't use `python3`, `jq`, or anything not in the base image. Use `sed`, `grep`, and shell builtins.
 
-3. **KV v2 paths require `/data/`** — Policies must reference `secret/data/grafana/*`, not `secret/grafana/*`. The CLI hides this. Policies and API calls don't.
+3. **KV v2 paths require `/data/`**  --  Policies must reference `secret/data/grafana/*`, not `secret/grafana/*`. The CLI hides this. Policies and API calls don't.
 
-4. **20 req/10s will break your browser** — A single Grafana page load generates 40+ requests in 2 seconds. 100 req/10s is the tested minimum for normal browser use.
+4. **20 req/10s will break your browser**  --  A single Grafana page load generates 40+ requests in 2 seconds. 100 req/10s is the tested minimum for normal browser use.
 
-5. **Test with real clients** — `curl` validates the mechanism. It doesn't simulate how a browser actually behaves. Always test with both.
+5. **Test with real clients**  --  `curl` validates the mechanism. It doesn't simulate how a browser actually behaves. Always test with both.
 
-6. **OpenBAO CLI runs inside the container** — `sudo docker exec -it openbao sh`, then set `BAO_ADDR` and `BAO_TOKEN`. Use `http://127.0.0.1:8200` inside; `https://192.168.100.182` from external hosts.
+6. **OpenBAO CLI runs inside the container**  --  `sudo docker exec -it openbao sh`, then set `BAO_ADDR` and `BAO_TOKEN`. Use `http://127.0.0.1:8200` inside; `https://192.168.100.182` from external hosts.
 
-7. **`docker compose restart` doesn't reload env vars** — Use `--force-recreate` for structural or environment changes. This bit us in Phase 6.3 *and* Phase 6.2. It will bite you too.
+7. **`docker compose restart` doesn't reload env vars**  --  Use `--force-recreate` for structural or environment changes. This bit us in Phase 6.3 *and* Phase 6.2. It will bite you too.
 
-8. **`sed -i` is fine for HAProxy but lethal for YAML** — HAProxy config is plain ASCII. YAML files get UTF-8 corruption from `sed`. Use `nano` or `cat >` for YAML edits.
+8. **`sed -i` is fine for HAProxy but lethal for YAML**  --  HAProxy config is plain ASCII. YAML files get UTF-8 corruption from `sed`. Use `nano` or `cat >` for YAML edits.
 
-9. **`systemctl reload` over `restart`** — Reload applies config without dropping connections. Production-safe.
+9. **`systemctl reload` over `restart`**  --  Reload applies config without dropping connections. Production-safe.
 
-10. **Back up before every config change** — `cp file file.backup.$(date +%Y%m%d-%H%M%S)`. This saved me at least twice.
+10. **Back up before every config change**  --  `cp file file.backup.$(date +%Y%m%d-%H%M%S)`. This saved me at least twice.
 
-11. **Duplicate datasources cause browser auth popups** — If you provisioned a datasource after manually creating one, you have two. The old one without `basicAuth` will trigger `WWW-Authenticate` popups that look like HAProxy or Grafana auth issues. Delete duplicates via the API before they haunt you.
+11. **Duplicate datasources cause browser auth popups**  --  If you provisioned a datasource after manually creating one, you have two. The old one without `basicAuth` will trigger `WWW-Authenticate` popups that look like HAProxy or Grafana auth issues. Delete duplicates via the API before they haunt you.
 
-12. **Dashboard panels reference datasources by UID, not name** — Delete a datasource and every panel pointing at its UID shows "No data" with zero explanation. Before deleting any datasource, query all dashboards for UID references first.
+12. **Dashboard panels reference datasources by UID, not name**  --  Delete a datasource and every panel pointing at its UID shows "No data" with zero explanation. Before deleting any datasource, query all dashboards for UID references first.
 
-13. **stdin piping through `docker exec` is unreliable** — `docker exec curl -d @- < /tmp/file.json` doesn't work reliably. Use `docker cp` to move the file into the container first, then reference it locally with `-d @/tmp/file.json`.
+13. **stdin piping through `docker exec` is unreliable**  --  `docker exec curl -d @- < /tmp/file.json` doesn't work reliably. Use `docker cp` to move the file into the container first, then reference it locally with `-d @/tmp/file.json`.
 
-14. **Don't assume log file paths in containers** — Grafana logs to `/var/log/grafana/grafana.log`, not the often-documented `/var/lib/grafana/log/`. Use `find / -name "*.log"` inside the container to locate them.
+14. **Don't assume log file paths in containers**  --  Grafana logs to `/var/log/grafana/grafana.log`, not the often-documented `/var/lib/grafana/log/`. Use `find / -name "*.log"` inside the container to locate them.
 
 [![Docker Compose command behavior matrix showing which commands apply config changes](/images/ep3-docker-matrix.jpg)](/images/ep3-docker-matrix.jpg)
 
@@ -2139,8 +2139,8 @@ Write these down. Tattoo them somewhere. They'll save you hours.
 
 This stack is hardened. It's not finished.
 
-- **Phase 7.1** — Remaining hardening items
-- **Authentik hardening** — TLS, security headers, default misconfiguration audit (separate episode)
+- **Phase 7.1**  --  Remaining hardening items
+- **Authentik hardening**  --  TLS, security headers, default misconfiguration audit (separate episode)
 
 The third video in the "Build It, Break It, Fix It" series covers this final hardened architecture. B-roll is planned. If you've ever wanted to watch someone's rate limiter break on camera because a single browser tab fired 50 requests in two seconds, or watch a duplicate datasource cause a mystery popup that takes five diagnostic steps to trace, that footage exists now.
 
@@ -2150,16 +2150,16 @@ Stay paranoid.
 
 ## Sources & Frameworks
 
-- **NIST SP 800-53 Rev 5** — Security and Privacy Controls for Information Systems and Organizations: [https://csrc.nist.gov/publications/detail/sp/800-53/rev-5/final](https://csrc.nist.gov/publications/detail/sp/800-53/rev-5/final)
-- **CIS Controls v8** — Center for Internet Security Critical Security Controls: [https://www.cisecurity.org/controls/v8](https://www.cisecurity.org/controls/v8)
-- **CIS Docker Benchmark** — Container hardening guidelines: [https://www.cisecurity.org/benchmark/docker](https://www.cisecurity.org/benchmark/docker)
-- **PCI-DSS v4.0** — Payment Card Industry Data Security Standard: [https://www.pcisecuritystandards.org/document_library/](https://www.pcisecuritystandards.org/document_library/)
-- **AICPA SOC 2** — Trust Services Criteria (CC series): [https://www.aicpa.org/resources/landing/system-and-organization-controls-soc-suite-of-services](https://www.aicpa.org/resources/landing/system-and-organization-controls-soc-suite-of-services)
-- **Grafana Documentation** — Configuration and administration: [https://grafana.com/docs/grafana/latest/](https://grafana.com/docs/grafana/latest/)
-- **HAProxy Documentation** — Configuration manual: [https://docs.haproxy.org/](https://docs.haproxy.org/)
-- **OpenBAO Documentation** — Secrets management and PKI: [https://openbao.org/docs/](https://openbao.org/docs/)
-- **Prometheus Documentation** — Basic auth and web configuration: [https://prometheus.io/docs/](https://prometheus.io/docs/)
+- **NIST SP 800-53 Rev 5**  --  Security and Privacy Controls for Information Systems and Organizations: [https://csrc.nist.gov/publications/detail/sp/800-53/rev-5/final](https://csrc.nist.gov/publications/detail/sp/800-53/rev-5/final)
+- **CIS Controls v8**  --  Center for Internet Security Critical Security Controls: [https://www.cisecurity.org/controls/v8](https://www.cisecurity.org/controls/v8)
+- **CIS Docker Benchmark**  --  Container hardening guidelines: [https://www.cisecurity.org/benchmark/docker](https://www.cisecurity.org/benchmark/docker)
+- **PCI-DSS v4.0**  --  Payment Card Industry Data Security Standard: [https://www.pcisecuritystandards.org/document_library/](https://www.pcisecuritystandards.org/document_library/)
+- **AICPA SOC 2**  --  Trust Services Criteria (CC series): [https://www.aicpa.org/resources/landing/system-and-organization-controls-soc-suite-of-services](https://www.aicpa.org/resources/landing/system-and-organization-controls-soc-suite-of-services)
+- **Grafana Documentation**  --  Configuration and administration: [https://grafana.com/docs/grafana/latest/](https://grafana.com/docs/grafana/latest/)
+- **HAProxy Documentation**  --  Configuration manual: [https://docs.haproxy.org/](https://docs.haproxy.org/)
+- **OpenBAO Documentation**  --  Secrets management and PKI: [https://openbao.org/docs/](https://openbao.org/docs/)
+- **Prometheus Documentation**  --  Basic auth and web configuration: [https://prometheus.io/docs/](https://prometheus.io/docs/)
 
 ---
 
-*© 2026 Oob Skulden™ — Stay Paranoid.*
+*© 2026 Oob Skulden™  --  Stay Paranoid.*
