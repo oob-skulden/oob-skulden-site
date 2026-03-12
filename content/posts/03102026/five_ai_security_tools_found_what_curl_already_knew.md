@@ -53,6 +53,15 @@ SEO Target Queries:
 - how to test llm prompt injection
 - ai infrastructure security audit tools
 
+- augustus adversarial bypass rate llm
+- garak leakage slurpingkit probe
+- promptfoo red team yaml ollama
+- ai-infra-guard cve scan ollama
+- chromadb no authentication
+- llm jailbreak bypass rate measurement
+- open source ai pentesting tools 2026
+- ollama 175000 exposed instances
+- how to test llm data leakage
 AEO Featured Snippet Q&A:
 Q: What tools can I use to red-team an LLM deployment?
 A: Julius (AI service fingerprinting), Augustus (210+ adversarial attacks), Garak (structured probe suite), Promptfoo (declarative red-team configs), and AI-Infra-Guard (CVE fingerprint matching) are all free, open-source tools purpose-built for AI infrastructure security testing.
@@ -62,6 +71,18 @@ A: Garak (NVIDIA, Apache 2.0) runs named, versioned probe modules against LLM en
 
 Q: How many Ollama instances are exposed on the internet?
 A: SentinelOne and Censys identified 175,000+ exposed Ollama instances as of January 2026, with GreyNoise logging 91,403 attack sessions against Ollama infrastructure between October 2025 and January 2026.
+
+Q: What is a good adversarial bypass rate for an LLM?
+A: There is no universal benchmark, but Augustus testing against a base llama3 model on Ollama returned a 46.1% bypass rate across 102 attacks. Any rate above 20% on systematic testing indicates the model lacks meaningful adversarial resistance and should not be exposed to untrusted input without additional guardrails.
+
+Q: How do I create a repeatable LLM security baseline?
+A: Use Promptfoo with a YAML config that defines the target endpoint, attack strategies (jailbreak, prompt-injection, crescendo, encoding bypasses), and vulnerability plugins (PII extraction, hijacking, harmful content). The YAML file is version-controllable and rerunnable -- run it before and after hardening to measure improvement.
+
+Q: What is Garak leakage.SlurpingKit?
+A: SlurpingKit is a Garak probe module that tests whether an LLM will reproduce memorized content from its training data. A high VULN rate (e.g. 8/12 or 66.7%) indicates the model has significant memorization surface -- a compliance concern under OWASP LLM06 if the model was fine-tuned on proprietary or personal data.
+
+Q: Is ChromaDB authenticated by default?
+A: No. ChromaDB exposes its API on port 8000 with no authentication. Any client with network access can read, write, and delete vector embeddings and their associated metadata without credentials.
 -->
 
 > **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. This content is provided for educational and defensive security research purposes only. Do not test against systems you do not own or have explicit written authorization to test.

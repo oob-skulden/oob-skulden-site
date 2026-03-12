@@ -40,6 +40,46 @@ ShowPostNavLinks: true
 ShowShareButtons: false
 ---
 
+<!--
+SEO Target Queries:
+- authentik security audit
+- authentik RCE expression policy
+- CVE-2026-25227 authentik exploit
+- authentik expression policy code execution
+- authentik .env file security
+- authentik password policy weak
+- authentik metrics endpoint authentication
+- authentik blueprint API backdoor
+- authentik recovery key god mode
+- authentik container security audit
+- identity provider security audit homelab
+- authentik hardening guide
+- authentik docker exec recovery key
+- authentik ak_message exfiltration
+- authentik postgresql direct access
+- authentik CSP missing login page
+
+Featured Snippet Targets:
+
+Q: Can Authentik expression policies execute arbitrary code?
+A: Yes. The expression policy API at /api/v3/policies/expression/ accepts arbitrary Python code in the expression field. Any user with an API token and add/change permissions on expression policies can create and execute code on the Authentik server via the /api/v3/policies/all/{uuid}/test/ endpoint, using ak_message() to exfiltrate output.
+
+Q: What is CVE-2026-25227?
+A: CVE-2026-25227 is a critical code injection vulnerability in Authentik before 2025.12.4 where users with delegated RBAC permissions (not just superusers) can execute arbitrary Python via expression policy creation and the test endpoint. This enables full remote code execution including secret extraction and database credential theft.
+
+Q: How do I harden Authentik?
+A: Lock down the .env file to chmod 600 and chown root:root, move secrets to a vault like OpenBAO, set password policy minimum to 15 characters with HaveIBeenPwned breach checking enabled, deploy a reverse proxy with CSP and HSTS headers, add read_only: true and no-new-privileges to Docker Compose, restrict Docker socket access, and update to 2025.12.4+ to patch CVE-2026-25227.
+
+Q: Is the Authentik .env file a security risk?
+A: Yes. The .env file contains the SECRET_KEY and PostgreSQL password in plaintext. If file permissions allow read access (default 664), any user on the system can extract database credentials and directly query PostgreSQL to dump all user accounts, password hashes, and superuser group memberships -- bypassing Authentik entirely with no audit trail.
+
+Q: Can you get admin access to Authentik with Docker exec?
+A: Yes. Anyone with Docker socket access can run docker exec authentik-server ak create_recovery_key 10 akadmin to generate a recovery URL that grants full superuser access with no password, no MFA, and no policy evaluation. This is two commands from Docker exec to god-mode.
+
+Q: Does Authentik have a Content Security Policy?
+A: No. As of 2025.12.3, the Authentik login page has no Content-Security-Policy header. The page includes inline scripts without nonce attributes, meaning any injected script is indistinguishable from legitimate code. X-Frame-Options (DENY) and X-Content-Type-Options (nosniff) are present, but CSP, HSTS, and Permissions-Policy are missing.
+-->
+
 > **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. This content is provided for educational and defensive security research purposes only. Do not test against systems you do not own or have explicit written authorization to test.
 >
 > This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies are derived from publicly available frameworks, published CVE advisories, and open-source tool documentation. All tools referenced are free, open-source, and publicly available.

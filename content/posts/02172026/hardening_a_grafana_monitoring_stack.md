@@ -50,6 +50,49 @@ Your Grafana instance has a weak password. Your Prometheus is wide open. Your ex
 
 I know this because mine was, too.
 
+
+<!--
+SEO Target Queries:
+- grafana hardening guide step by step
+- grafana production security checklist
+- prometheus basic auth setup
+- haproxy tls grafana configuration
+- grafana session timeout configuration
+- grafana rate limiting haproxy
+- openbao grafana secrets management
+- docker container capability drop grafana
+- grafana exporter lockdown
+- grafana anonymous access disable
+- prometheus exposed endpoints security
+- grafana brute force protection haproxy
+- docker compose restart vs force-recreate
+- grafana entrypoint script secrets injection
+- cis docker benchmark grafana
+- grafana audit logging json
+
+Featured Snippet Targets:
+
+Q: How do I harden a Grafana monitoring stack?
+A: Start with strong admin credentials, add TLS via HAProxy, enable Prometheus basic auth and bind it to localhost, remove exporter port bindings so only Prometheus reaches them over Docker internal networking, add session timeouts (1h inactive, 24h max), configure rate limiting in HAProxy at 100 req/10s, drop all container capabilities except CHOWN/SETGID/SETUID/DAC_OVERRIDE, set resource limits, move secrets to OpenBAO or Vault, and enable structured JSON audit logging.
+
+Q: Why does docker compose restart not apply environment variable changes?
+A: docker compose restart only stops and starts the existing container without re-reading docker-compose.yml or recreating the container. Environment variables are baked in at container creation time. Use docker compose up -d --force-recreate to rebuild the container with updated environment variables from the compose file.
+
+Q: How do I add basic auth to Prometheus?
+A: Create a web-config.yml file with a bcrypt-hashed password under basic_auth_users, mount it into the Prometheus container as read-only, add --web.config.file=/etc/prometheus/web-config.yml to the command, and set file permissions to 644 (not 600) because Prometheus runs as user nobody inside the container.
+
+Q: What capabilities does Grafana need in Docker?
+A: Grafana needs only four Linux capabilities: CHOWN (file ownership during startup), SETGID and SETUID (switching to the grafana user), and DAC_OVERRIDE (required for SQLite database writes). Drop all others with cap_drop ALL and add back only these four. Removing DAC_OVERRIDE causes a crash loop with "attempt to write a readonly database."
+
+Q: How do I inject secrets into Grafana from OpenBAO or Vault?
+A: Create an entrypoint.sh script that authenticates to OpenBAO via AppRole, fetches secrets using curl and sed-based JSON parsing (Alpine containers lack python3 and jq), then launches Grafana with exec env VAR=value /run.sh. The exec env pattern is mandatory because simple export does not persist through exec.
+
+Q: Why does Grafana show a browser auth popup after adding Prometheus authentication?
+A: A duplicate Prometheus datasource without basicAuth configured causes Prometheus to return a WWW-Authenticate header, which the browser interprets as a credential prompt. Check for duplicate datasources via the API and delete the one without basicAuth. Grafana provisioning creates new datasources alongside existing ones -- it does not replace them.
+
+Q: What is a safe rate limit for Grafana behind HAProxy?
+A: 100 requests per 10 seconds (600/minute). A single Grafana page load generates 40+ HTTP requests in under 2 seconds for JS bundles, CSS, fonts, API calls, and websockets. Setting the limit at 20 req/10s -- which passes curl testing -- will break real browser sessions immediately.
+-->
 This is the complete, unfiltered lab notebook from hardening a Grafana monitoring stack  --  every command, every output, every failure, and the moment a single browser tab broke my rate limiter. No sanitized tutorial energy here. Just the raw reality of taking a stack from "please hack me" to defense-in-depth across seven vulnerability categories in about six hours.
 
 The methodology is dead simple: **one step at a time. Explain. Execute. Validate. Proceed.** That rule got established early, after the very first vulnerability fix went sideways because I tried to combine steps and skip explanations. More on that in a moment.

@@ -3,7 +3,7 @@ title: "I Broke Into an AI Chatbot Using a Fake Model. Here's Exactly How."
 date: 2026-03-06T12:00:00-05:00
 draft: false
 author: "Oob Skulden™"
-description: "A full attack chain against Open WebUI v0.6.33 -- from a single chat message to root RCE, admin JWT forgery, and persistent backdoor. Every command, every dead end, every fix. CVE-2025-64496 exploitation, Ollama CVE gauntlet, and the implicit trust failures in self-hosted AI infrastructure."
+description: "Full attack chain against Open WebUI v0.6.33 -- from a chat message to root RCE, admin JWT forgery, and persistent backdoor. CVE-2025-64496 exploitation with every command and dead end documented."
 tags:
   - Open WebUI
   - Ollama
@@ -55,6 +55,15 @@ Target queries:
 - open webui hardening guide
 - ollama CVE reproduction
 
+- open webui tools API RCE
+- open webui run as root container
+- open webui api key survives password change
+- open webui WEBUI_SECRET_KEY default
+- open webui JWT forgery /proc/1/environ
+- ollama unauthenticated model deletion
+- ollama api no authentication
+- open webui direct connections security risk
+- CVE-2024-37032 probllama reproduction
 Featured snippet Q&A pairs:
 
 Q: What is CVE-2025-64496?
@@ -68,6 +77,15 @@ A: Upgrade to v0.6.35+, set an explicit WEBUI_SECRET_KEY, disable Direct Connect
 
 Q: Do Open WebUI API keys survive password changes?
 A: Yes. Open WebUI API keys (sk- prefixed) are stored independently in the database and are not revoked when a user changes their password. Incident response must explicitly delete API keys before or during account deprovisioning.
+
+Q: Does Open WebUI run as root by default?
+A: Yes. The default Docker image runs as uid=0(root). Any code execution vulnerability -- including the Tools API -- gives the attacker full root access inside the container, including the ability to read /proc/1/environ for JWT signing secrets and pivot to other containers on the Docker network.
+
+Q: Can an attacker pivot from Open WebUI to Ollama?
+A: Yes. When Open WebUI and Ollama share a Docker bridge network, a compromised Open WebUI container can reach Ollama's unauthenticated API at http://ollama:11434. This allows model enumeration, deletion, poisoning, and inference -- bypassing any perimeter firewall rules on port 11434.
+
+Q: How do I check if my Ollama API is exposed?
+A: Run curl http://your-host:11434/api/tags from any machine that can reach the host. If it returns a model list without requiring authentication, the full management API is accessible to anyone with network access. Ollama has no built-in authentication on any endpoint.
 -->
 
 > **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. This content is provided for educational and defensive security research purposes only. Do not test against systems you do not own or have explicit written authorization to test.

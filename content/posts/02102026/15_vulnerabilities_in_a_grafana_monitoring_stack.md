@@ -51,6 +51,45 @@ ShowPostNavLinks: true
 ShowShareButtons: false
 ---
 
+<!--
+SEO Target Queries:
+- grafana vulnerability assessment
+- prometheus unauthenticated access security risk
+- cadvisor exposed port 8080
+- blackbox exporter ssrf
+- node exporter metrics exposure
+- grafana session persistence vulnerability
+- grafana brute force no rate limiting
+- grafana service account backdoor
+- monitoring stack security audit
+- docker container capability audit
+- grafana oauth plaintext credentials
+- prometheus infrastructure enumeration
+- grafana session cookie no expiry
+- cis docker benchmark assessment
+- monitoring stack attack surface
+
+Featured Snippet Targets:
+
+Q: Is Prometheus authenticated by default?
+A: No. Prometheus exposes its full query API on port 9090 with zero authentication. Any client with network access can enumerate host details, kernel versions, every monitored service with internal IPs and ports, the full scrape configuration, and all stored metrics -- providing a complete infrastructure map without credentials.
+
+Q: Can Blackbox Exporter be used for SSRF?
+A: Yes. Blackbox Exporter's /probe endpoint accepts arbitrary target URLs. An attacker who can reach port 9115 can use it to probe services on other VLANs that they cannot reach directly, defeating network segmentation without leaving their machine.
+
+Q: Do Grafana sessions expire by default?
+A: No. Default Grafana sessions have no timeout configured. A session cookie works indefinitely from any machine on the network. If a user account is disabled in the identity provider, their existing Grafana session continues working because Grafana does not validate sessions against the IdP after initial authentication.
+
+Q: What can an attacker see through cAdvisor port 8080?
+A: cAdvisor exposes machine-level hardware details (CPU count, memory, disk), a full inventory of every running container including names and images, and real-time resource usage metrics -- all without authentication on port 8080.
+
+Q: How do you create a persistent backdoor in Grafana?
+A: An attacker with admin access can create a service account with Admin role and generate a permanent API token via the service accounts API. This token works from any machine, never expires by default, and survives admin password changes -- providing persistent access even after the original compromise is remediated.
+
+Q: Does Grafana have brute force protection?
+A: No. Default Grafana has no rate limiting, account lockout, progressive delays, or rate limit headers. An attacker can execute thousands of login attempts per minute from any network-accessible machine with no throttling or detection.
+-->
+
 > **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. This content is provided for educational and defensive security research purposes only. Do not test against systems you do not own or have explicit written authorization to test.
 >
 > This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies are derived from publicly available frameworks, published CVE advisories, and open-source tool documentation. All tools referenced are free, open-source, and publicly available.

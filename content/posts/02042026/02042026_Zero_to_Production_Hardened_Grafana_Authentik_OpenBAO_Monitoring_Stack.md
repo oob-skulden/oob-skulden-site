@@ -51,6 +51,44 @@ ShowPostNavLinks: true
 ShowShareButtons: false
 ---
 
+<!--
+SEO Target Queries:
+- authentik grafana oauth setup
+- authentik grafana failed to get token from provider
+- grafana oauth button not showing
+- grafana redirect uri localhost oauth
+- authentik flow does not apply to current user
+- grafana sign up is disabled oauth
+- grafana user sync failed authentik
+- authentik 2025.12 docker compose setup
+- grafana authentik oidc across vlans
+- docker compose restart vs force-recreate environment variables
+- grafana x509 cannot validate certificate ip san
+- authentik secret key too short w009
+- prometheus monitoring stack docker compose
+- grafana oauth role mapping jmespath authentik
+
+Featured Snippet Targets:
+
+Q: Why does Grafana show "Failed to get token from provider" with Authentik?
+A: This error has three common causes: (1) the OAuth client secret doesn't match byte-for-byte between Authentik and Grafana -- check for trailing newlines with wc -c, (2) Grafana's backend can't validate Authentik's TLS certificate because the self-signed cert lacks an IP SAN entry, or (3) GF_SERVER_ROOT_URL isn't set, causing Grafana to send localhost as the redirect URI.
+
+Q: Why is the "Sign in with Authentik" button missing from the Grafana login page?
+A: Grafana environment variables are baked into the container at creation time. Running docker compose restart reuses the existing container with its original environment. Use docker compose up -d --force-recreate after changing the .env file to rebuild the container with updated variables.
+
+Q: How do I fix "Flow does not apply to current user" in Authentik?
+A: The Authentik initial setup flow only runs against an empty database. If the PostgreSQL volume has data from a previous installation, run docker compose down -v to destroy volumes, then docker compose up -d. Use an incognito browser window to avoid stale session cookies.
+
+Q: How do I fix "User sync failed" when logging into Grafana with Authentik OAuth?
+A: This occurs when a conflicting user record exists in Grafana's database with the same email but a different auth_id, typically from testing OAuth with the akadmin account. Delete the conflicting user in Grafana's admin UI under Server Admin > Users. Always use dedicated test accounts for OAuth testing.
+
+Q: Why does Grafana send localhost as the redirect URI during OAuth?
+A: Grafana constructs OAuth redirect URIs from GF_SERVER_ROOT_URL. If this variable isn't set, it defaults to localhost. Set GF_SERVER_ROOT_URL to the actual IP or hostname of your Grafana instance, then force-recreate the container.
+
+Q: Does Authentik 2025.12 still require Redis?
+A: No. Authentik 2025.12 removed the Redis dependency entirely. Caching and task queuing are handled through PostgreSQL. Redis references in older guides should be ignored -- adding Redis to the compose file will either be silently ignored or break the deployment.
+-->
+
 
 > **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. This content is provided for educational and defensive security research purposes only. Do not test against systems you do not own or have explicit written authorization to test.
 >
