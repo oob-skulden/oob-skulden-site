@@ -37,6 +37,8 @@
   status = 301
   force = true
 
+
+
 # ----------------------------
 # Security headers
 # ----------------------------
@@ -49,3 +51,16 @@
     Permissions-Policy = "geolocation=(), microphone=(), camera=()"
     Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
     Content-Security-Policy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; frame-src https://www.youtube-nocookie.com https://www.youtube.com;"
+
+# ----------------------------
+# Dead link redirects (removed posts)
+# ----------------------------
+[[redirects]]
+  from = "/2025/12/how-i-built-a-pre-commit-security-audit-on-a-flight-to-houston-because-im-cheap-and-paranoid/"
+  to = "/posts/"
+  status = 301
+
+[[redirects]]
+  from = "/2026/01/why-static-site-security-is-a-lie-we-tell-ourselves/"
+  to = "/posts/"
+  status = 301
