@@ -78,8 +78,10 @@ A: docker exec spawns a new process with the container's base environment and do
 Schema: TechArticle
 -->
 
-> **Compliance Disclaimer**
-> This article documents a personal homelab security audit conducted by an individual researcher in a personal capacity. It does not reflect the views, opinions, or positions of any employer, past or present. This is not professional security consulting advice. All techniques were performed exclusively on personal homelab infrastructure. Do not test these techniques on systems you do not own or do not have explicit written authorization to test.
+> **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. This content is provided for educational and defensive security research purposes only. Do not test against systems you do not own or have explicit written authorization to test.
+>
+> This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies are derived from publicly available frameworks, published CVE advisories, and open-source tool documentation. All tools referenced are free, open-source, and publicly available.
+
 
 ## This Is Part 2
 
