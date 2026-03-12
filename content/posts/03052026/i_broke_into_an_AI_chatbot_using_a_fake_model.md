@@ -121,7 +121,10 @@ Authentication is enabled. This is not a zero-auth misconfiguration story. The a
 **Discovered by:** Vitaly Simonovich, Cato CTRL (published November 7, 2025)  
 **CWE:** CWE-95 --- Improper Neutralization of Directives in Dynamically Evaluated Code  
 
+
 Open WebUI has a feature called **Direct Connections**. It lets users add any external OpenAI-compatible model server as a model source. Point it at a URL, give it a name, and the models from that server appear in the model selector alongside the local Ollama models.
+
+[![CVE-2025-64496 SSE execute event flow showing JWT theft from victim's browser](/images/ep5-sse-flow.jpg)](/images/ep5-sse-flow.jpg)
 
 This is a genuinely useful feature. It's also, in v0.6.33, a loaded gun pointed at every user's session.
 
