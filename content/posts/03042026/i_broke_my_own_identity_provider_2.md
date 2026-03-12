@@ -40,11 +40,9 @@ ShowPostNavLinks: true
 ShowShareButtons: false
 ---
 
-> This content represents personal educational work produced in my individual capacity. It does not reflect the views, opinions, or positions of any employer, past or present. This is not professional security consulting advice. All tools and methods discussed are based on publicly available frameworks and open-source tool documentation.
+> **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. This content is provided for educ>
 >
-> All techniques demonstrated were performed exclusively on personal homelab infrastructure that I own and operate. Do not test these techniques on systems you do not own or do not have explicit written authorization to test. The CVEs referenced in this post (CVE-2026-25227, CVE-2026-25748, CVE-2026-25922) are publicly disclosed and patched in Authentik 2025.12.4.
-
-## The Uncomfortable Truth About Your SSO Gateway
+> This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies are derived from publicly available frameworks, published CVE advisories, and op>
 
 Here's a scenario that should keep you up at night. You deploy an identity provider â€” the single front door to every application in your infrastructure. You configure it once, maybe twice. You trust it. You move on.
 
