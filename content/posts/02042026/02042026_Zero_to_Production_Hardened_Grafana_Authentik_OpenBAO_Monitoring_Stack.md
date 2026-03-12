@@ -90,6 +90,8 @@ Authentik-lab runs three containers: the Authentik server (ports 9000/9443), a b
 
 Grafana-lab runs five containers across two Docker networks. This is where it gets interesting.
 
+[![Full lab architecture showing VLAN segmentation, OAuth flow between Grafana and Authentik, port mappings, and identified vulnerabilities](/images/episode1a.jpg)](/images/episode1a.jpg)
+
 Grafana, Prometheus, and Blackbox Exporter share `grafana_network`. Node Exporter and cAdvisor live on a separate `prometheus_network`. Prometheus bridges both because it's the collector -- it needs to reach every exporter. But Grafana doesn't need direct access to Node Exporter or cAdvisor. Separating them limits lateral movement if any single container is compromised. That's a smaller trust boundary than putting everything on one flat network, and it costs you nothing to set up.
 
 ```
@@ -154,6 +156,8 @@ Understanding two distinct connection types in the OAuth2/OIDC flow saves hours 
 First, the user's browser redirects to Authentik for login. This is a **browser-to-server** connection. If Authentik is running a self-signed cert, the user can click through the warning and move on.
 
 Second, after the user authenticates and gets redirected back with an authorization code, Grafana's backend makes a **server-to-server** HTTP call to Authentik's token endpoint to exchange that code for tokens. This call enforces strict TLS validation. No click-through option. No human in the loop.
+
+[![OAuth2/OIDC flow diagram showing browser redirect vs server-to-server token exchange](/images/oauth-flow-diagram.jpg)](/images/oauth-flow-diagram.jpg)
 
 This distinction is why self-signed certs break OAuth in ways that aren't immediately obvious. The browser half works fine. The server half silently rejects the certificate. Grafana logs `x509: cannot validate certificate` and the user sees a generic "Login failed" message.
 
@@ -820,6 +824,8 @@ A new dedicated user couldn't log in: "User sync failed." Grafana's user list sh
 ---
 
 ## What's Deployed and What's Exposed
+
+[![Pre-hardening attack surface map showing all exposed ports, plaintext credential paths, and missing security controls](/images/attack-surface-map.jpg)](/images/attack-surface-map.jpg)
 
 The stack is functional. Authentik handles authentication, Grafana serves dashboards with role-based access, Prometheus scrapes metrics from four exporters, and group-based policy enforcement denies access to users outside the permitted groups.
 

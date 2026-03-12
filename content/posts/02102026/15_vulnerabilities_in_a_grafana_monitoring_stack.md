@@ -107,6 +107,8 @@ In this document, we're going to prove all of that. Every vulnerability gets two
 
 The goal isn't to be scary. The goal is to show you exactly what's exposed so that when we fix it in Part 2, you understand *why* each fix matters. You can't defend what you don't understand.
 
+[![Jump box attack surface showing all 15 vulnerabilities across three VLANs](/images/ep2_jumpbox-attack-surface.jpg)](/images/ep2_jumpbox-attack-surface.jpg)
+
 ---
 
 ## Prerequisites — What Must Exist Before Phase 1
@@ -234,6 +236,8 @@ Phase 1 targets the two vulnerabilities that, combined, create the most dangerou
 - Grafana OAuth config: https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/#generic-oauth
 
 #### PROVE IT
+
+[![VULN-06 terminated employee attack chain showing session persistence after account disable](/images/ep2_session-persistence-chain.jpg)](/images/ep2_session-persistence-chain.jpg)
 
 ```bash
 # From jump box — attacker perspective
@@ -749,6 +753,8 @@ curl -s http://$GRAFANA:8080/metrics | grep "cadvisor_version\|machine_cpu\|mach
 
 **What we're trying to break:** We're going to use Blackbox as a proxy to reach OpenBAO on VLAN 100 and Authentik on VLAN 80 — from a jump box that's only on VLAN 75. The whole point of VLAN segmentation is to isolate traffic between networks. Blackbox defeats that completely because it sits on a host that can reach all three VLANs, and it'll probe whatever URL you give it.
 
+[![SSRF pivot diagram showing Blackbox Exporter crossing VLAN boundaries on the attacker's behalf](/images/ep2_ssrf-pivot-diagram.jpg)](/images/ep2_ssrf-pivot-diagram.jpg)
+
 **API Reference:**
 - Blackbox Exporter: https://github.com/prometheus/blackbox_exporter
 - Blackbox Configuration: https://github.com/prometheus/blackbox_exporter/blob/master/CONFIGURATION.md
@@ -1178,6 +1184,8 @@ sudo nft list ruleset 2>/dev/null | grep -c "rule"
 ---
 
 ## Security Score Progression
+
+[![Hardening phase progression from 6.0 baseline to 9.8 production-ready](/images/ep2_hardening-phase-flow.jpg)](/images/ep2_hardening-phase-flow.jpg)
 
 | Phase | Score | Improvement | VULNs Addressed |
 |-------|-------|-------------|-----------------|
