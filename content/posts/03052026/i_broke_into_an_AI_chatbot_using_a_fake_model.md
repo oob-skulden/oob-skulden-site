@@ -108,6 +108,8 @@ Two accounts in the system:
 
 Authentication is enabled. This is not a zero-auth misconfiguration story. The attacker has no credentials at all at the start of this session.
 
+[![Episode 3.2 lab architecture showing Open WebUI, Ollama, and attacker's malicious model server](/images/ep5-lab-architecture.jpg)](/images/ep5-lab-architecture.jpg)
+
 ---
 
 ## The Vulnerability: CVE-2025-64496
