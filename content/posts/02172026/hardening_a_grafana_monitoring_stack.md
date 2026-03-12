@@ -165,6 +165,8 @@ Let me count the ways this was broken:
 
 Every single vulnerability was wide open. Let's fix them.
 
+[![Before and after architecture showing 15 vulnerabilities closed across the monitoring stack](/images/ep3-before-after.jpg)](/images/ep3-before-after.jpg)
+
 ---
 
 ## Chapter 1: Default/Weak Credentials (VULN-01)
@@ -391,6 +393,8 @@ sudo systemctl start haproxy && sudo systemctl status haproxy
 ```
 
 Output: `Active: active (running)` — three ports listening: `*:80` (redirect), `*:443` (HTTPS), `127.0.0.1:8404` (stats, localhost only).
+
+[![HAProxy traffic flow showing TLS termination, localhost binding, and rate limiting lesson](/images/ep3-haproxy-flow.jpg)](/images/ep3-haproxy-flow.jpg)
 
 **Test from localhost:**
 
@@ -754,7 +758,9 @@ curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://192.168.75.109
 
 All three wide open from another VLAN. That cAdvisor endpoint? It can leak environment variables from running containers. Think about what's in those variables for a moment.
 
-**The fix — remove port bindings entirely:**
+[![Exporter lockdown showing before/after network exposure and the self-scrape surprise](/images/ep3-exporter-lockdown.jpg)](/images/ep3-exporter-lockdown.jpg)
+
+**The fix - remove port bindings entirely:**
 
 We rewrote `docker-compose.yml`, removing the `ports:` sections from all three exporters. Why remove them entirely instead of binding to `127.0.0.1`? Because there's no reason to access these from the host. Only Prometheus needs them, and it reaches them through Docker's internal network by container name. Less surface area.
 
@@ -987,6 +993,8 @@ Mar 03 14:39:23 ... 200 ... "GET .../api/search?limit=30&type=dash-db HTTP/2.0"
 ---
 
 ## Chapter 8: OpenBAO Secrets — Getting There Is Half the Battle
+
+[![OpenBAO secret injection pipeline from encrypted vault through entrypoint.sh to running Grafana](/images/ep3-secret-pipeline.jpg)](/images/ep3-secret-pipeline.jpg)
 
 The goal: move three plaintext credentials out of `~/monitoring/.env` and into OpenBAO's encrypted KV v2 store.
 
@@ -1358,8 +1366,9 @@ sudo journalctl -u haproxy --no-pager -n 50
 All 50 requests returned 200. Zero 429 rejections. ~50 requests served in ~2 seconds. Page loaded fully.
 
 ---
-
 ## The Complete Scorecard
+
+[![Hardening progression mapped to 18 chapters from 6.0 to 9.8](/images/ep3-chapter-progression.jpg)](/images/ep3-chapter-progression.jpg)
 
 | # | Vulnerability | Fix | Status |
 |---|---|---|---|
@@ -1377,9 +1386,9 @@ All 50 requests returned 200. Zero 429 rejections. ~50 requests served in ~2 sec
 
 ---
 
-## Chapter 15: Snapshot Exfiltration — The Data Leak You Forgot About (Phase 6.3)
+## Chapter 15: Snapshot Exfiltration - The Data Leak You Forgot About (Phase 6.3)
 
-Here's a fun default nobody talks about: any authenticated Grafana user can create a public snapshot with no expiration. That snapshot gets published to `snapshots.raintank.io` — an external service. The snapshot URL requires no authentication to view. And here's the part that should make your stomach drop: **the snapshot persists even after you delete the user's account.**
+Here's a fun default nobody talks about: any authenticated Grafana user can create a public snapshot with no expiration. That snapshot gets published to `snapshots.raintank.io` - an external service. The snapshot URL requires no authentication to view. And here's the part that should make your stomach drop: **the snapshot persists even after you delete the user's account.**
 
 Fire a contractor. Revoke their OAuth access. Delete their Grafana account entirely. The snapshot they created last Tuesday? Still live. Still public. Still containing your infrastructure metrics.
 
@@ -1441,7 +1450,7 @@ grep -A 2 "SNAPSHOT" ~/monitoring/docker-compose.yml
       - GF_SNAPSHOTS_EXTERNAL_SNAPSHOT_URL=
 ```
 
-**Verify it's a single entry** (the terminal had displayed a false duplicate because example "expected output" text was accidentally pasted into the shell — yes, really):
+**Verify it's a single entry** (the terminal had displayed a false duplicate because example "expected output" text was accidentally pasted into the shell - yes, really):
 
 ```bash
 grep -n "SNAPSHOT" ~/monitoring/docker-compose.yml
@@ -1517,6 +1526,8 @@ It appeared on every dashboard page, even after successfully logging in through 
 Tested in a fresh incognito window. Logged in as `akadmin` (Authentik admin account) via OAuth. Same behavior. Not a cache issue. Not a permissions issue.
 
 So what's sending a `WWW-Authenticate` header?
+
+[![Duplicate datasource diagnostic chain showing browser popup mystery and cascading panel failures](/images/ep3-datasource-diagnostic.jpg)](/images/ep3-datasource-diagnostic.jpg)
 
 ### The Diagnostic Chain
 
@@ -2104,6 +2115,8 @@ Write these down. Tattoo them somewhere. They'll save you hours.
 13. **stdin piping through `docker exec` is unreliable** — `docker exec curl -d @- < /tmp/file.json` doesn't work reliably. Use `docker cp` to move the file into the container first, then reference it locally with `-d @/tmp/file.json`.
 
 14. **Don't assume log file paths in containers** — Grafana logs to `/var/log/grafana/grafana.log`, not the often-documented `/var/lib/grafana/log/`. Use `find / -name "*.log"` inside the container to locate them.
+
+[![Docker Compose command behavior matrix showing which commands apply config changes](/images/ep3-docker-matrix.jpg)](/images/ep3-docker-matrix.jpg)
 
 ---
 

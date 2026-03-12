@@ -513,6 +513,8 @@ Open WebUI does not revoke API keys when passwords change. The `sk-` key is a co
 
 If your incident response plan says "have the user change their password," you have a gap.
 
+[![Credential survival matrix showing what persists after password change, restart, and account deletion](/images/ep5-credential-survival.jpg)](/images/ep5-credential-survival.jpg)
+
 **NIST 800-53:** AC-2 (Account Management), IA-5 (Authenticator Management), AC-17 (Remote Access)  
 **SOC 2:** CC6.1 (Logical Access), CC6.3 (Authorization Removal)  
 **PCI-DSS v4.0:** Req 8.2.6 (Inactive accounts disabled within 90 days), Req 8.3.9 (Credentials changed if compromised), Req 8.6.3 (Application/system account credentials protected)  
@@ -1086,6 +1088,8 @@ token = jwt.encode(
 ```
 
 The forged token is byte-for-byte identical to the real admin token because it's generated with the same inputs. The server cannot distinguish them because there's nothing to distinguish.
+
+[![JWT secret extraction from /proc/1/environ and admin token forgery](/images/ep5-proc-extraction.jpg)](/images/ep5-proc-extraction.jpg)
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: "I Broke My Own Identity Provider"
-date: 2026-03-01T12:00:00-05:00
+date: 2026-02-25T12:00:00-05:00
 draft: false
 author: "Oob Skulden™"
 description: "A complete live audit of Authentik 2025.12.3 — every command, every dead end, every lesson. 10 of 15 findings confirmed exploitable including full RCE from a non-superuser account, database compromise, and a two-command path to god-mode. Zero downloaded tools."
@@ -40,9 +40,9 @@ ShowPostNavLinks: true
 ShowShareButtons: false
 ---
 
-> **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. � 1030) and equivalent laws in other jurisdictions. This content is provided for educ>
+> **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. This content is provided for educational and defensive security research purposes only. Do not test against systems you do not own or have explicit written authorization to test.
 >
-> This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies are derived from publicly available frameworks, published CVE advisories, and op>
+> This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies are derived from publicly available frameworks, published CVE advisories, and open-source tool documentation. All tools referenced are free, open-source, and publicly available.
 
 Here's a scenario that should keep you up at night. You deploy an identity provider — the single front door to every application in your infrastructure. You configure it once, maybe twice. You trust it. You move on.
 
