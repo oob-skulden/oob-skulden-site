@@ -64,3 +64,13 @@
   from = "/2026/01/why-static-site-security-is-a-lie-we-tell-ourselves/"
   to = "/posts/"
   status = 301
+
+[[redirects]]
+  from = "/2026/01/building-an-oauth-security-mapper-before-i-had-oauth-to-map/"
+  to = "/posts/"
+  status = 301
+
+[[redirects]]
+  from = "/tools/ultimate-security-audit/"
+  to = "/tools/"
+  status = 301
