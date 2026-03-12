@@ -36,7 +36,7 @@ cover:
   image: ""
   alt: "HAProxy returning 403 on the Authentik expression policy RCE path -- F-03 closed at the network layer"
   caption: "The F-03 RCE path blocked at the proxy before it reaches Authentik."
-canonicalURL: "https://oobskulden.com/posts/i-fixed-my-own-identity-provider/"
+canonicalURL: "https://oobskulden.com/2026/03/hardening-authentik-every-misconfiguration-i-found-in-my-own-idp/"
 ShowReadingTime: true
 ShowBreadCrumbs: true
 ShowPostNavLinks: true
@@ -85,7 +85,7 @@ Schema: TechArticle
 
 ## This Is Part 2
 
-In Part 1 -- [I Broke My Own Identity Provider](https://oobskulden.com/posts/i-broke-my-own-identity-provider/) -- I ran a complete live audit of Authentik 2025.12.3 from a jump box on a separate VLAN using only pre-installed Linux tools. The result: 10 of 15 findings confirmed exploitable, including full RCE from a non-superuser account, complete database compromise, and a two-command path to god-mode administrative access. The entire attack chain took under 15 minutes.
+In Part 1 -- [I Broke My Own Identity Provider](https://oobskulden.com/2026/02/i-broke-my-own-identity-provider/) -- I ran a complete live audit of Authentik 2025.12.3 from a jump box on a separate VLAN using only pre-installed Linux tools. The result: 10 of 15 findings confirmed exploitable, including full RCE from a non-superuser account, complete database compromise, and a two-command path to god-mode administrative access. The entire attack chain took under 15 minutes.
 
 Part 1 ended with a list of fixes. This article is those fixes -- every command, every gotcha, every dead end, and every verification step. The same four-phase methodology applies: Prove It, Break It, Harden It, Verify It. This article covers the Harden It and Verify It phases in full.
 
