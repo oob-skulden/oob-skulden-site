@@ -10,7 +10,7 @@ hidemeta: true
 
 Enterprise-grade security shouldn't require enterprise budgets.
 
-This site focuses on **practical security for homelab builders and small teams** — the kind that works when you're responsible for *everything*, not just one slice of the stack. All techniques are developed and tested in a personal homelab environment. Adapt to your specific context.
+This site focuses on **practical security for homelab builders and small teams** -- the kind that works when you're responsible for *everything*, not just one slice of the stack. All techniques are developed and tested in a personal homelab environment. Adapt to your specific context.
 
 The goal: make modern security achievable without excess tooling, process theater, or unrealistic assumptions.
 
@@ -31,7 +31,7 @@ Every article emphasizes:
 
 - Working detection queries you can copy and adapt
 - Complete remediation paths, not just alerts
-- Honest tool comparisons — including limitations
+- Honest tool comparisons -- including limitations
 - Compliance mappings (NIST, SOC 2, PCI-DSS) for educational reference
 - Architectures built on open-source and low-cost tools
 
@@ -53,11 +53,11 @@ Every article emphasizes:
 
 ---
 
-## About Oob Skulden™
+## About Oob Skuldenâ„¢
 
 Oob Skulden is a pseudonym.
 
-I've spent over **20 years across networking, systems administration, database engineering, and security** — from early enterprise environments to modern infrastructure — with the last **15+ years focused on security** under real-world constraints: limited budgets, small teams, and competing priorities.
+I've spent over **20 years across networking, systems administration, database engineering, and security** -- from early enterprise environments to modern infrastructure -- with the last **15+ years focused on security** under real-world constraints: limited budgets, small teams, and competing priorities.
 
 I run an extensive homelab where every technique published here is tested first.
 
@@ -69,9 +69,9 @@ I run an extensive homelab where every technique published here is tested first.
 
 Most security guidance assumes unlimited budget, specialization, and time. Most homelabs and small teams don't have that.
 
-This site focuses on the **overlooked parts of self-hosted infrastructure** — where risk quietly accumulates — and documents how to address them with realistic detection and remediation strategies, tested in a real homelab before they're published.
+This site focuses on the **overlooked parts of self-hosted infrastructure** -- where risk quietly accumulates -- and documents how to address them with realistic detection and remediation strategies, tested in a real homelab before they're published.
 
-When something appears here, it has already been tested — often broken — and rebuilt. The articles reflect systems that actually run, including the mistakes made building them and the lessons learned fixing them.
+When something appears here, it has already been tested -- often broken -- and rebuilt. The articles reflect systems that actually run, including the mistakes made building them and the lessons learned fixing them.
 
 If you're responsible for security *and everything else*, you're in the right place.
 
@@ -85,4 +85,4 @@ Articles are backed by homelab experiments, working tools, detection logic, and 
 
 ---
 
-*Oob Skulden™ is a personal educational project. Content is based on publicly available frameworks, open-source tools, and documented best practices. Compliance framework references (NIST, SOC 2, PCI-DSS) are provided for educational mapping purposes only. This site does not provide professional security consulting services.*
+*Oob Skuldenâ„¢ is a personal educational project. Content is based on publicly available frameworks, open-source tools, and documented best practices. Compliance framework references (NIST, SOC 2, PCI-DSS) are provided for educational mapping purposes only. This site does not provide professional security consulting services.*
