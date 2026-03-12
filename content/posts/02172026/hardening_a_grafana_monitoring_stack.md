@@ -38,9 +38,11 @@ ShowPostNavLinks: true
 ShowShareButtons: false
 ---
 
-> *This content was created in my personal capacity using personal equipment and personal time. All techniques are demonstrated in my personal homelab environment. This does not represent the views or practices of any employer.*
 
->  **Lab Environment Only.** All vulnerability demonstrations and hardening techniques in this post are performed on personal homelab infrastructure. Do not attempt these techniques on systems you do not own or have explicit written permission to test.
+> **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. This content is provided for educational and defensive security research purposes only. Do not test against systems you do not own or have explicit written authorization to test.
+>
+> This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies are derived from publicly available frameworks, published CVE advisories, and open-source tool documentation. All tools referenced are free, open-source, and publicly available.
+
 
 ---
 

@@ -2,7 +2,7 @@
 title: "Authentik + Grafana: OAuth SSO Across VLANs and the 11 Things That Broke"
 date: 2026-02-04T08:00:00-06:00
 draft: false
-author: "Oob Skulden™"
+author: "Oob Skuldenâ„¢"
 description: "A complete walkthrough of deploying Authentik as an OIDC provider for Grafana and Prometheus across a multi-VLAN lab, including every issue encountered, the diagnostic reasoning behind each fix, and the security trade-offs made along the way."
 tags:
   - Security
@@ -51,7 +51,10 @@ ShowPostNavLinks: true
 ShowShareButtons: false
 ---
 
-*The views and opinions expressed on this site are my own and do not reflect the views of my employer. This content is based entirely on publicly available documentation for open-source tools and does not contain proprietary information from any current or former employer.*
+
+> **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. Â§ 1030) and equivalent laws in other jurisdictions. This content is provided for educational and defensive security research purposes only. Do not test against systems you do not own or have explicit written authorization to test.
+>
+> This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies are derived from publicly available frameworks, published CVE advisories, and open-source tool documentation. All tools referenced are free, open-source, and publicly available.
 
 ---
 
@@ -927,4 +930,4 @@ Grafana-lab (192.168.75.109):
 
 ---
 
-*Published by Oob Skulden™ -- Stay Paranoid.*
+*Published by Oob Skuldenâ„¢ -- Stay Paranoid.*
