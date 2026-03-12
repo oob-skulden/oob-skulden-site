@@ -902,7 +902,7 @@ The correct relative path from `/root/.ollama/models/blobs/` to the manifests di
 
 > "The path traversal is real. Ollama followed our traversal path, fetched our payload, and wrote it to a staging location. The only thing standing between this and a persistent arbitrary file write is a SHA256 check that uses the traversal string itself as the expected hash --- which can never match. In the versions Wiz tested, the attack chains two pulls to work around this. We reproduced the mechanism. The full chain is an exercise for the Break block."
 
-That's a stronger, more honest camera moment than a silent exploit.
+
 
 ---
 
@@ -931,7 +931,7 @@ curl -s http://localhost:11434/api/generate \
 
 The model never registered --- the `@sha256:` reference only works when the blob is present in Ollama's manifest system, not just the blobs directory. Getting CVE-2024-39720 to fire requires a more carefully crafted GGUF --- valid enough to register as a model, malformed enough to crash during tensor loading. Our 24-byte stub was too malformed to get past the initial format check.
 
-**Verdict:** Not reproducible with stdlib tools in the available session time. The attack surface is real but requires a GGUF that's surgically malformed --- valid header, valid metadata, invalid tensor data. That's a 30-minute binary crafting exercise that would have produced weak camera footage. We documented it and moved on.
+**Verdict:** Not reproducible with stdlib tools in the available session time. The attack surface is real but requires a GGUF that's surgically malformed --- valid header, valid metadata, invalid tensor data.
 
 ---
 
