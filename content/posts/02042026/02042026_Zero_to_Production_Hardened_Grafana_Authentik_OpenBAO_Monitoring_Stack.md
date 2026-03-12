@@ -1,6 +1,6 @@
 ---
 title: "Authentik + Grafana: OAuth SSO Across VLANs and the 11 Things That Broke"
-date: 2026-02-14T08:00:00-06:00
+date: 2026-02-04T08:00:00-06:00
 draft: false
 author: "Oob Skulden™"
 description: "A complete walkthrough of deploying Authentik as an OIDC provider for Grafana and Prometheus across a multi-VLAN lab, including every issue encountered, the diagnostic reasoning behind each fix, and the security trade-offs made along the way."

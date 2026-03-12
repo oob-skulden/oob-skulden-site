@@ -1,6 +1,6 @@
 ---
 title: "15 Vulnerabilities in a Grafana Monitoring Stack (And How We Found Them)"
-date: 2026-02-15T10:00:00-06:00
+date: 2026-02-07T10:00:00-06:00
 draft: false
 author: "Oob Skulden™"
 description: "A full vulnerability assessment of a Grafana/Prometheus monitoring stack across two VLANs. 98 commands, 15 confirmed vulnerabilities, and the investigative chain that led to each finding -- including the dead ends."

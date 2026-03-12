@@ -52,6 +52,8 @@ This is the complete, unfiltered lab notebook from hardening a Grafana monitorin
 
 The methodology is dead simple: **one step at a time. Explain. Execute. Validate. Proceed.** That rule got established early, after the very first vulnerability fix went sideways because I tried to combine steps and skip explanations. More on that in a moment.
 
+{{< youtube xNsXRXXgRrQ >}}
+
 ---
 
 ## The Environment
