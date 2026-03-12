@@ -1,5 +1,5 @@
 ---
-title: "I Fixed My Own Identity Provider"
+title: "Hardening Authentik: Every Misconfiguration I Found in My Own IdP"
 date: 2026-03-02T08:00:00-06:00
 lastmod: 2026-03-02T08:00:00-06:00
 draft: false
