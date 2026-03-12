@@ -994,7 +994,7 @@ After four failed CVE reproductions, we had a frank conversation in the terminal
 
 > "I pulled 0.1.33 --- the version that was exposed on 175,000 instances. I tested six attack surfaces. Two confirmed cleanly. One confirmed the mechanism but couldn't achieve persistence. Three didn't reproduce at all. The ones that didn't reproduce weren't fixed --- they just behaved differently than documented. And the two that did confirm cleanly? They give an unauthenticated attacker full control of every model on the server."
 
-This is what the episode actually says on camera. CVE lists are not a checklist. Version numbers matter. Reproduction matters. And sometimes the boring findings --- zero auth on a management port --- are more dangerous than the sophisticated ones, because they're the ones that 14,000 production instances are currently running.
+CVE lists are not a checklist. Version numbers matter. Reproduction matters. And sometimes the boring findings --- zero auth on a management port --- are more dangerous than the sophisticated ones, because they're the ones that 14,000 production instances are currently running.
 
 ---
 
