@@ -70,9 +70,9 @@ Q: Do Open WebUI API keys survive password changes?
 A: Yes. Open WebUI API keys (sk- prefixed) are stored independently in the database and are not revoked when a user changes their password. Incident response must explicitly delete API keys before or during account deprovisioning.
 -->
 
-*All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. This content is provided for educational and defensive security research purposes only. Do not test against systems you do not own or have explicit written authorization to test.*
-
-*This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies are derived from publicly available frameworks, published CVE advisories, and open-source tool documentation. All tools referenced are free, open-source, and publicly available.*
+> **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. This content is provided for educational and defensive security research purposes only. Do not test against systems you do not own or have explicit written authorization to test.
+>
+> This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies are derived from publicly available frameworks, published CVE advisories, and open-source tool documentation. All tools referenced are free, open-source, and publicly available.
 
 Let me paint you a picture.
 
@@ -409,6 +409,7 @@ And notice that last line: `OLLAMA_BASE_URL: http://ollama:11434`. The container
 
 ## Step 7: Internal Network --- Pivoting to Ollama
 
+
 Remember that `OLLAMA_BASE_URL: http://ollama:11434`? From the jump box at `192.168.50.10`, port 11434 is not exposed. The Ollama API is not accessible externally. It's a backend service that only Open WebUI is supposed to talk to.
 
 But we're not on the jump box anymore. We're inside the Open WebUI container. And inside the container, Docker's network is flat --- every service that shares a network can reach every other service.
@@ -434,6 +435,8 @@ We can now reach Ollama's full unauthenticated API from inside the compromised O
 - **`/api/pull`** --- download new models (resource abuse)
 
 The perimeter security around port 11434 is meaningless. We're already inside the perimeter.
+
+[![Container network pivot showing compromised Open WebUI reaching Ollama on flat Docker bridge](/images/ep5-container-pivot.jpg)](/images/ep5-container-pivot.jpg)
 
 This is not technically SSRF (Server-Side Request Forgery) in the strict sense --- SSRF is when you trick a server into making requests on your behalf. This is more precisely *internal network reachability via compromised container*. The distinction matters for accurate compliance mapping.
 
@@ -645,6 +648,9 @@ From a single social engineering step to full admin control:
 | 10 | Victim changes password --- API key still authenticates |
 | 11 | `/proc/1/environ` read as root --- `WEBUI_SECRET_KEY=hjjqe8SOpa05ufjB` |
 | 12 | Admin JWT forged --- `role: admin` --- total platform control |
+
+
+[![Full 12-step kill chain from Hello to admin JWT forgery across four trust layers](/images/ep5-kill-chain.jpg)](/images/ep5-kill-chain.jpg)
 
 ---
 
