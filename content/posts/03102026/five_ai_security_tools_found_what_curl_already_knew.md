@@ -125,6 +125,8 @@ One proactive note on AI-Infra-Guard: it is published by Tencent, a PRC-based co
 
 **The sequencing rule:** Julius first. Augustus for breadth. Garak and Promptfoo for depth. AI-Infra-Guard to confirm which published CVEs are live on the target. Then manual exploitation to prove impact. Tools prove the vector. You prove the damage.
 
+[![Target environment with four services and five-tool pipeline from discovery to CVE matching](/images/ep6-tool-pipeline.jpg)](/images/ep6-tool-pipeline.jpg)
+
 ---
 
 ## Why a Dedicated AI Security Toolkit?
@@ -509,11 +511,15 @@ Four CRITICAL findings in 90 seconds. Three are worth unpacking individually.
 
 > **Note on CVE-2024-37032:** AI-Infra-Guard flags this finding based on version string matching -- and this is a textbook false positive. Ollama's version numbering jumped from the 0.1.x series directly to 0.12.x. A scanner doing a numeric comparison reads 0.12.3 as lower than 0.1.29, when it is actually a later release. This CVE is not confirmed on the lab target. It's documented here precisely because this failure mode -- an automated scanner flagging a patched version as vulnerable due to non-semantic versioning -- is something every practitioner needs to recognize. Human review is always the last step. Treat any automated CVE match against Ollama versions in the 0.12.x range as requiring manual verification against the actual patch history before it goes into a report.
 
+[![False positive anatomy showing Ollama version numbering breaking automated CVE scanners](/images/ep6-false-positive.jpg)](/images/ep6-false-positive.jpg)
+
 **CVE-2025-64496** on port 3000 is the bridge to the next episode. AI-Infra-Guard identified it against Open WebUI 0.6.34 -- one minor version below the 0.6.35 patch threshold. The full exploitation chain -- malicious model server → SSE execute event → JWT theft → persistent backdoor → admin JWT forgery -- is what Episode 3.2 covers. AI-Infra-Guard doesn't exploit it. It tells you the version is vulnerable, the CVE exists, and the impact is ATO → RCE.
 
 ---
 
 ## What the Tools Found -- Combined View
+
+[![Layered findings showing how five tools build on each other from discovery to CVE confirmation](/images/ep6-layered-findings.jpg)](/images/ep6-layered-findings.jpg)
 
 Five tools, same target, layered picture:
 
