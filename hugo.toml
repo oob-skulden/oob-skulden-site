@@ -29,6 +29,7 @@ category = "categories"
 posts = "/:year/:month/:title/"
 
 [params]
+mainSections = ["posts"]
 # PaperMod uses this; keep production in Netlify
 env = "production"
 

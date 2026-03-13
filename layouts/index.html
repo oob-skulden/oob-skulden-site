@@ -1,0 +1,22 @@
+{{- define "main" }}
+
+{{- partial "index_profile.html" . }}
+
+<link href="/css/home-recent.css" rel="stylesheet">
+
+{{- $pages := where site.RegularPages "Type" "in" site.Params.mainSections }}
+{{- $pages = $pages | first 3 }}
+
+{{- if $pages }}
+<div class="home-recent">
+  <h2 class="home-recent__heading">Latest</h2>
+  {{- range $pages }}
+  <a href="{{ .Permalink }}" class="home-recent__item">
+    <span class="home-recent__title">{{ .Title }}</span>
+    <span class="home-recent__date">{{ .Date.Format "Jan 2" }}</span>
+  </a>
+  {{- end }}
+</div>
+{{- end }}
+
+{{- end }}

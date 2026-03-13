@@ -1,0 +1,33 @@
+.home-recent {
+  max-width: 700px;
+  margin: 2rem auto 0;
+  padding: 0 1rem;
+}
+.home-recent__heading {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--secondary);
+  margin-bottom: 0.75rem;
+}
+.home-recent__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--primary);
+}
+.home-recent__item:hover {
+  color: var(--secondary);
+}
+.home-recent__title {
+  font-size: 0.95rem;
+}
+.home-recent__date {
+  font-size: 0.8rem;
+  color: var(--secondary);
+  white-space: nowrap;
+  margin-left: 1rem;
+}
