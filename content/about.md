@@ -8,48 +8,27 @@ hidemeta: true
 
 ## The Mission
 
-Enterprise-grade security shouldn't require enterprise budgets.
+Enterprise-grade security shouldn't require enterprise budgets. This site exists because most security guidance assumes unlimited resources, deep specialization, and dedicated teams. Most homelabs and small teams don't have that.
 
-This site focuses on **practical security for homelab builders and small teams** -- the kind that works when you're responsible for *everything*, not just one slice of the stack. All techniques are developed and tested in a personal homelab environment. Adapt to your specific context.
-
-The goal: make modern security achievable without excess tooling, process theater, or unrealistic assumptions.
+The focus here is practical security for people who build and maintain their own infrastructure -- the kind that works when you're responsible for everything, not just one slice of the stack. Every technique is developed and tested in a personal homelab before it shows up here. Adapt to your context.
 
 ---
 
 ## Who This Is For
 
-- Homelab builders who want to do security right from the start
-- Security engineers on small or understaffed teams
-- DevSecOps practitioners managing tool sprawl
-- Anyone tired of "best practices" that assume unlimited budget and time
+If you run a homelab and want to do security right from the start, this is for you. Same goes for security engineers on small or understaffed teams, DevSecOps practitioners drowning in tool sprawl, and anyone who's tired of "best practices" that assume you have a headcount of 40 and a six-figure tool budget.
 
 ---
 
-## What You'll Find Here
+## What You'll Find
 
-Every article emphasizes:
-
-- Working detection queries you can copy and adapt
-- Complete remediation paths, not just alerts
-- Honest tool comparisons -- including limitations
-- Compliance mappings (NIST, SOC 2, PCI-DSS) for educational reference
-- Architectures built on open-source and low-cost tools
+Every article ships with working detection queries you can copy and adapt, complete remediation paths instead of just alerts, and honest tool evaluations that include limitations. Where it's relevant, posts map findings to compliance frameworks (NIST 800-53, SOC 2, PCI-DSS, CIS Controls) for educational reference. Everything is built on open-source and low-cost tools because cost is a design constraint, not an afterthought.
 
 ---
 
 ## The Approach
 
-1. **Vendor-agnostic analysis**
-   Tools are evaluated based on what they do, how they fail, and how they fit into real environments.
-
-2. **No theory without practice**
-   Every recommendation is tested in a live homelab environment before it's published here.
-
-3. **Open-source first, always**
-   Cost is treated as a design constraint, not an afterthought.
-
-4. **No generic advice**
-   Specific tools, specific commands, specific outcomes.
+Tools are evaluated based on what they actually do, how they fail, and how they fit into real environments -- not based on marketing copy. Every recommendation is tested in a live homelab before it gets published. There's no generic advice here. Specific tools, specific commands, specific outcomes.
 
 ---
 
@@ -57,32 +36,16 @@ Every article emphasizes:
 
 Oob Skulden is a pseudonym.
 
-I've spent over **20 years across networking, systems administration, database engineering, and security** -- from early enterprise environments to modern infrastructure -- with the last **15+ years focused on security** under real-world constraints: limited budgets, small teams, and competing priorities.
+Behind it is over 20+ years across networking, systems administration, database engineering, and security -- from early enterprise environments to modern infrastructure -- with the last 15+ years focused on security under real-world constraints: limited budgets, small teams, and competing priorities.
 
-I run an extensive homelab where every technique published here is tested first.
-
-*All content on this site represents my own personal educational work, created in a personal capacity. This site is not affiliated with, endorsed by, or representative of any employer, past or present. Content is intended for homelab and educational purposes only. This site does not provide professional security consulting services.*
-
----
-
-## Why This Site Exists
-
-Most security guidance assumes unlimited budget, specialization, and time. Most homelabs and small teams don't have that.
-
-This site focuses on the **overlooked parts of self-hosted infrastructure** -- where risk quietly accumulates -- and documents how to address them with realistic detection and remediation strategies, tested in a real homelab before they're published.
-
-When something appears here, it has already been tested -- often broken -- and rebuilt. The articles reflect systems that actually run, including the mistakes made building them and the lessons learned fixing them.
-
-If you're responsible for security *and everything else*, you're in the right place.
+The homelab where everything gets tested is extensive. When something appears on this site, it has already been built, broken, and rebuilt. The articles reflect systems that actually run, including the mistakes made building them and the lessons learned fixing them.
 
 ---
 
 ## Behind the Site
 
-This site is static by design. The work behind it is not.
-
-Articles are backed by homelab experiments, working tools, detection logic, and open-source research. Infrastructure and tooling evolve continuously and are validated before anything is published.
+This site is static by design. The work behind it is not. Articles are backed by homelab experiments, working tools, detection logic, and open-source research. Infrastructure and tooling evolve continuously and are validated before anything is published.
 
 ---
 
-*Oob Skulden™ is a personal educational project. Content is based on publicly available frameworks, open-source tools, and documented best practices. Compliance framework references (NIST, SOC 2, PCI-DSS) are provided for educational mapping purposes only. This site does not provide professional security consulting services.*
+*Oob Skulden™ is a personal educational project. All content represents personal work created in a personal capacity and is not affiliated with, endorsed by, or representative of any employer, past or present. Content is based on publicly available frameworks, open-source tools, and documented best practices. Compliance framework references are provided for educational mapping purposes only. This site does not provide professional security consulting services.*

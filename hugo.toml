@@ -36,7 +36,7 @@ description = "Practical security guidance for home lab enthusiasts"
 author = "Oob Skulden"
 
 ShowReadingTime = true
-ShowShareButtons = true
+ShowShareButtons = false
 ShowPostNavLinks = true
 ShowBreadCrumbs = true
 ShowCodeCopyButtons = true
