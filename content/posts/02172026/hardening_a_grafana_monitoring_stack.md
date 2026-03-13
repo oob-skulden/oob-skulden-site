@@ -5,15 +5,17 @@ draft: false
 author: "Oob Skulden™"
 description: "A complete live hardening session for a Grafana monitoring stack  --  every command, every failure, every fix. 15 vulnerabilities across seven categories, from anonymous access and exposed Prometheus endpoints to plaintext secrets and a single browser tab that broke the rate limiter."
 tags:
-  - Grafana
-  - Prometheus
-  - Monitoring Security
-  - HAProxy
-  - Docker
-  - Secrets Management
-  - Container Security
-  - Homelab
-  - Hardening
+  - "Grafana"
+  - "Prometheus"
+  - "HAProxy"
+  - "Docker"
+  - "Secrets Management"
+  - "Container Security"
+  - "Monitoring"
+  - "Hardening"
+  - "Homelab"
+series:
+  - "Grafana Monitoring Stack"
 categories:
   - Security Audits
 keywords:

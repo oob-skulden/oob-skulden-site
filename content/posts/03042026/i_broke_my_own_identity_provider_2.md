@@ -5,16 +5,16 @@ draft: false
 author: "Oob Skulden™"
 description: "A complete live audit of Authentik 2025.12.3 — every command, every dead end, every lesson. 10 of 15 findings confirmed exploitable including full RCE from a non-superuser account, database compromise, and a two-command path to god-mode. Zero downloaded tools."
 tags:
-  - Authentik
-  - Identity Provider
-  - Security Audit
-  - RCE
-  - Docker
-  - CVE-2026-25227
-  - Expression Policy
-  - Secrets Management
-  - Container Security
-  - Homelab
+  - "Authentik"
+  - "Security Audit"
+  - "RCE"
+  - "Docker"
+  - "CVE-2026-25227"
+  - "Container Security"
+  - "Secrets Management"
+  - "Homelab"
+series:
+  - "Authentik Identity Provider"
 categories:
   - Security Audits
 keywords:

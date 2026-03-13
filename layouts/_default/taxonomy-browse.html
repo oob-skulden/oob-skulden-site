@@ -1,0 +1,21 @@
+{{- define "main" }}
+
+<header class="page-header">
+  <h1>{{ .Title }}</h1>
+  {{- if .Description }}
+  <div class="post-description">{{ .Description }}</div>
+  {{- end }}
+</header>
+
+<link href="/css/taxonomy-browse.css" rel="stylesheet">
+
+<div class="taxonomy-cloud">
+  {{- range .Data.Terms.Alphabetical }}
+  <a href="{{ .Page.Permalink }}" class="taxonomy-tag">
+    <span class="taxonomy-tag__name">{{ .Page.Title }}</span>
+    <span class="taxonomy-tag__count">{{ .Count }}</span>
+  </a>
+  {{- end }}
+</div>
+
+{{- end }}

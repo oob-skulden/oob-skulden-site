@@ -7,18 +7,17 @@ author:
   - "Oob Skulden"
 description: "How to harden Authentik 2025.12.3 -- localhost bind, HAProxy path blocking and rate limiting, OpenBAO AppRole secrets injection, akadmin deactivation, and Docker worker capability hardening. Every command, every dead end, every lesson."
 tags:
-  - Authentik
-  - Docker
-  - HAProxy
-  - OpenBAO
-  - Identity Provider
-  - Hardening
-  - Homelab
-  - Secrets Management
+  - "Authentik"
+  - "Docker"
+  - "HAProxy"
+  - "OpenBAO"
+  - "Hardening"
+  - "Secrets Management"
+  - "Homelab"
 categories:
   - Security Hardening
 series:
-  - "Authentik Audit 2025.12.3"
+  - "Authentik Identity Provider"
 keywords:
   - "authentik hardening guide"
   - "authentik 2025.12.3 security"

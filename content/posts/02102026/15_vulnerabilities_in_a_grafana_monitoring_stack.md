@@ -5,19 +5,17 @@ draft: false
 author: "Oob Skulden™"
 description: "A full vulnerability assessment of a Grafana/Prometheus monitoring stack across two VLANs. 98 commands, 15 confirmed vulnerabilities, and the investigative chain that led to each finding -- including the dead ends."
 tags:
-  - Grafana
-  - Prometheus
-  - Security Assessment
-  - Monitoring
-  - Docker
-  - OAuth
-  - Vulnerability
-  - cAdvisor
-  - Node Exporter
-  - Blackbox Exporter
-  - SSRF
-  - Container Security
-  - Compliance
+  - "Grafana"
+  - "Prometheus"
+  - "Security Audit"
+  - "Monitoring"
+  - "Docker"
+  - "OAuth"
+  - "Container Security"
+  - "Compliance"
+  - "Homelab"
+series:
+  - "Grafana Monitoring Stack"
 categories:
   - Vulnerability Assessment
   - Security

@@ -19,6 +19,7 @@ filename = "sitemap.xml"
 pagerSize = 10
 
 [taxonomies]
+series = "series"
 tag = "tags"
 category = "categories"
 
@@ -53,17 +54,8 @@ Practical security for home labbers. Open source tools. Self-hosted architecture
 **No theory. Vendor-agnostic. Just working solutions.**
 """
 
-[[params.profileMode.buttons]]
-name = "Articles"
-url = "/posts/"
 
-[[params.profileMode.buttons]]
-name = "Tools"
-url = "/tools/"
 
-[[params.profileMode.buttons]]
-name = "About"
-url = "/about/"
 
 [params.label]
 text = "Oob Skulden"
@@ -88,3 +80,27 @@ url = "https://x.com/oobskulden"
 [[params.socialIcons]]
 name = "rss"
 url = "/index.xml"
+
+# ── Navigation menu ──────────────────────────────
+[[menus.main]]
+  name = "Articles"
+  url = "/posts/"
+  weight = 10
+
+[[menus.main]]
+  name = "Tags"
+  url = "/tags/"
+  weight = 20
+
+[[menus.main]]
+  name = "About"
+  url = "/about/"
+  weight = 50
+
+[[menus.main]]
+  name = "Search"
+  url = "/search/"
+  weight = 60
+
+[params.footer]
+  hideCopyright = true

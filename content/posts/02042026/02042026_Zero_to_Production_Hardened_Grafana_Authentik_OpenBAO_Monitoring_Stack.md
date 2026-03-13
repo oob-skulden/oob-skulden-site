@@ -5,19 +5,20 @@ draft: false
 author: "Oob Skulden™"
 description: "A complete walkthrough of deploying Authentik as an OIDC provider for Grafana and Prometheus across a multi-VLAN lab, including every issue encountered, the diagnostic reasoning behind each fix, and the security trade-offs made along the way."
 tags:
-  - Security
-  - AppSec
-  - DevSecOps
-  - Monitoring
-  - Container Security
-  - Secrets Management
-  - OAuth2
-  - SSO
-  - TLS
-  - Compliance
-  - Homelab
-  - Docker
-  - Infrastructure as Code
+  - "Authentik"
+  - "Grafana"
+  - "Prometheus"
+  - "OpenBAO"
+  - "OAuth"
+  - "HAProxy"
+  - "Docker"
+  - "Container Security"
+  - "Secrets Management"
+  - "Monitoring"
+  - "Compliance"
+  - "Homelab"
+series:
+  - "Grafana Monitoring Stack"
 categories:
   - Security
   - Engineering

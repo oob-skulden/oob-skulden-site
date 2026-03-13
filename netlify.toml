@@ -1,10 +1,11 @@
 [build]
-  command = "hugo --gc --minify"
+  command = "hugo --gc --minify && npx -y pagefind --site public"
   publish = "public"
 
 [build.environment]
   HUGO_VERSION = "0.153.2"
   HUGO_ENV = "production"
+  NODE_VERSION = "20"
 
 # ----------------------------
 # Canonical URL / SEO redirects

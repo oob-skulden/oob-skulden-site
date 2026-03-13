@@ -5,20 +5,13 @@ draft: false
 author: "Oob Skulden™"
 description: "Julius, Augustus, Garak, Promptfoo, and AI-Infra-Guard run against the same Ollama target from the prequel -- same vulnerability, but structured bypass rates, named CVE matches, and repeatable test configs that survive a security review."
 tags:
-  - Ollama
-  - LLM Security
-  - Red Team
-  - Prompt Injection
-  - AI Infrastructure
-  - Julius
-  - Augustus
-  - Garak
-  - Promptfoo
-  - AI-Infra-Guard
-  - CVE-2025-63389
-  - CVE-2025-64496
-  - Adversarial Testing
-  - Homelab
+  - "Ollama"
+  - "AI Infrastructure"
+  - "CVE-2025-63389"
+  - "CVE-2025-64496"
+  - "Homelab"
+series:
+  - "AI Infrastructure Security"
 categories:
   - AI Infrastructure Security Series
 keywords:

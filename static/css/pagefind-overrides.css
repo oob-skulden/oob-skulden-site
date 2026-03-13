@@ -1,0 +1,76 @@
+:root {
+  --pagefind-ui-scale: 1;
+  --pagefind-ui-primary: var(--primary);
+  --pagefind-ui-text: var(--primary);
+  --pagefind-ui-background: var(--theme);
+  --pagefind-ui-border: var(--border);
+  --pagefind-ui-tag: var(--tertiary);
+  --pagefind-ui-border-width: 1px;
+  --pagefind-ui-border-radius: 6px;
+  --pagefind-ui-image-border-radius: 6px;
+  --pagefind-ui-image-size: 0;
+  --pagefind-ui-font: inherit;
+}
+.pagefind-ui__search-input {
+  background-color: var(--theme) !important;
+  color: var(--primary) !important;
+  border: 1px solid var(--border) !important;
+  font-size: 1rem !important;
+  padding: 0.75rem 1rem !important;
+  border-radius: 6px !important;
+  width: 100% !important;
+}
+.pagefind-ui__search-input::placeholder {
+  color: var(--secondary) !important;
+  opacity: 0.7;
+}
+.pagefind-ui__search-input:focus {
+  border-color: var(--primary) !important;
+  outline: none !important;
+}
+.pagefind-ui__search-clear {
+  color: var(--secondary) !important;
+  background: none !important;
+}
+.pagefind-ui__result {
+  border-top: 1px dashed var(--border) !important;
+  padding: 1rem 0 !important;
+}
+.pagefind-ui__result-link {
+  color: var(--primary) !important;
+  font-weight: 600 !important;
+  font-size: 1.1rem !important;
+}
+.pagefind-ui__result-link:hover {
+  text-decoration: underline !important;
+}
+.pagefind-ui__result-excerpt {
+  color: var(--secondary) !important;
+  font-size: 0.9rem !important;
+  line-height: 1.6 !important;
+}
+mark.pagefind-ui__result-highlight {
+  background-color: transparent !important;
+  color: var(--primary) !important;
+  font-weight: 700 !important;
+}
+.pagefind-ui__message {
+  color: var(--secondary) !important;
+  font-size: 0.9rem !important;
+  padding: 1rem 0 !important;
+}
+.pagefind-ui__button {
+  background-color: var(--entry) !important;
+  color: var(--primary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+}
+.pagefind-ui__button:hover {
+  background-color: var(--border) !important;
+}
+.pagefind-ui__logo {
+  display: none !important;
+}
+.pagefind-ui__form::before {
+  display: none !important;
+}

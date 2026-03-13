@@ -5,18 +5,17 @@ draft: false
 author: "Oob Skulden™"
 description: "Full attack chain against Open WebUI v0.6.33 -- from a chat message to root RCE, admin JWT forgery, and persistent backdoor. CVE-2025-64496 exploitation with every command and dead end documented."
 tags:
-  - Open WebUI
-  - Ollama
-  - AI Infrastructure
-  - Security Audit
-  - RCE
-  - Docker
-  - CVE-2025-64496
-  - JWT
-  - SSE Injection
-  - Container Security
-  - Homelab
-  - XSS
+  - "Open WebUI"
+  - "Ollama"
+  - "AI Infrastructure"
+  - "Security Audit"
+  - "RCE"
+  - "Docker"
+  - "CVE-2025-64496"
+  - "Container Security"
+  - "Homelab"
+series:
+  - "AI Infrastructure Security"
 categories:
   - Security Audits
 keywords:
