@@ -43,7 +43,8 @@ ShowBreadCrumbs = true
 ShowCodeCopyButtons = true
 ShowRssButtonInSectionTermList = true
 
-defaultTheme = "auto"
+defaultTheme = "dark"
+disableThemeToggle = true
 ShowSearchPage = true
 
 [params.profileMode]
