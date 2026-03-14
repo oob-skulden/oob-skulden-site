@@ -1,0 +1,203 @@
+<style>
+  .ai-banner {
+    background: #0d0d0d;
+    border-bottom: 1px solid #00FF41;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+    font-family: 'Courier New', 'Courier', monospace;
+  }
+
+  .ai-banner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 255, 65, 0.015) 2px,
+      rgba(0, 255, 65, 0.015) 4px
+    );
+    pointer-events: none;
+  }
+
+  .ai-banner-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .ai-banner-badge {
+    background: #00FF41;
+    color: #0d0d0d;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    padding: 3px 8px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    animation: badge-pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes badge-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .ai-banner-text {
+    color: #c8c8c8;
+    font-size: 13px;
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .ai-banner-text strong {
+    color: #00FF41;
+    font-weight: 600;
+  }
+
+  .ai-banner-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #00FF41;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-decoration: none;
+    border: 1px solid #00FF41;
+    padding: 5px 12px;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+    text-transform: uppercase;
+  }
+
+  .ai-banner-cta:hover {
+    background: #00FF41;
+    color: #0d0d0d;
+  }
+
+  .ai-banner-cta::after {
+    content: '→';
+  }
+
+  .ai-banner-dismiss {
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0 0 0 8px;
+    flex-shrink: 0;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+
+  .ai-banner-dismiss:hover {
+    color: #00FF41;
+  }
+
+  .ai-banner-ticker {
+    width: 100%;
+    overflow: hidden;
+    border-top: 1px solid rgba(0, 255, 65, 0.15);
+    margin-top: 8px;
+    padding-top: 6px;
+    padding-bottom: 2px;
+  }
+
+  .ai-banner-ticker-track {
+    display: flex;
+    gap: 32px;
+    white-space: nowrap;
+    animation: ticker-scroll 28s linear infinite;
+  }
+
+  @keyframes ticker-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  .ai-banner-ticker-item {
+    font-size: 11px;
+    color: #444;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .ai-banner-ticker-item span {
+    color: #00FF41;
+    margin-right: 6px;
+  }
+
+  @media (max-width: 600px) {
+    .ai-banner-inner {
+      padding: 10px 16px;
+    }
+    .ai-banner-text {
+      font-size: 12px;
+    }
+  }
+</style>
+
+<div class="ai-banner" id="ai-series-banner" role="banner" aria-label="Upcoming Series Announcement">
+  <div class="ai-banner-inner">
+    <div class="ai-banner-badge">New Series</div>
+    <div class="ai-banner-text">
+      <strong>AI Infrastructure Security</strong> — Ollama · Open WebUI · RAG · LiteLLM · DLP · MCP Servers.
+      Every layer built, attacked, and hardened on camera.
+    </div>
+    <a href="/tags/ai-infrastructure/" class="ai-banner-cta">See the series</a>
+    <button
+      class="ai-banner-dismiss"
+      id="ai-banner-close"
+      aria-label="Dismiss announcement"
+    >X</button>
+
+    <div class="ai-banner-ticker">
+      <div class="ai-banner-ticker-track">
+        <div class="ai-banner-ticker-item"><span>//</span> Foundation &amp; Threat Modeling</div>
+        <div class="ai-banner-ticker-item"><span>//</span> Ollama API Security</div>
+        <div class="ai-banner-ticker-item"><span>//</span> Open WebUI · CVE-2025-64496</div>
+        <div class="ai-banner-ticker-item"><span>//</span> RAG Pipeline Poisoning</div>
+        <div class="ai-banner-ticker-item"><span>//</span> LiteLLM AI Gateway</div>
+        <div class="ai-banner-ticker-item"><span>//</span> DLP &amp; Data Flow</div>
+        <div class="ai-banner-ticker-item"><span>//</span> Multi-User &amp; Enterprise Auth</div>
+        <div class="ai-banner-ticker-item"><span>//</span> MCP Server Injection</div>
+        <div class="ai-banner-ticker-item"><span>//</span> CrewAI Agent Trust Boundaries</div>
+        <div class="ai-banner-ticker-item"><span>//</span> Foundation &amp; Threat Modeling</div>
+        <div class="ai-banner-ticker-item"><span>//</span> Ollama API Security</div>
+        <div class="ai-banner-ticker-item"><span>//</span> Open WebUI · CVE-2025-64496</div>
+        <div class="ai-banner-ticker-item"><span>//</span> RAG Pipeline Poisoning</div>
+        <div class="ai-banner-ticker-item"><span>//</span> LiteLLM AI Gateway</div>
+        <div class="ai-banner-ticker-item"><span>//</span> DLP &amp; Data Flow</div>
+        <div class="ai-banner-ticker-item"><span>//</span> Multi-User &amp; Enterprise Auth</div>
+        <div class="ai-banner-ticker-item"><span>//</span> MCP Server Injection</div>
+        <div class="ai-banner-ticker-item"><span>//</span> CrewAI Agent Trust Boundaries</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    if (localStorage.getItem('ai-banner-dismissed') === '1') {
+      var el = document.getElementById('ai-series-banner');
+      if (el) el.style.display = 'none';
+    }
+
+    var btn = document.getElementById('ai-banner-close');
+    if (btn) {
+      btn.addEventListener('click', function() {
+        document.getElementById('ai-series-banner').style.display = 'none';
+        localStorage.setItem('ai-banner-dismissed', '1');
+      });
+    }
+  })();
+</script>

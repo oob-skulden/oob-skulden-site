@@ -51,7 +51,7 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "geolocation=(), microphone=(), camera=()"
     Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
-    Content-Security-Policy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; frame-src https://www.youtube-nocookie.com https://www.youtube.com;"
+    Content-Security-Policy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'sha256-WXt90wSoKMqZIKpGqTVF4ve/wQ2NfRKQGF6Am9Km5Kw=' 'sha256-aLmRnK/quV8WVZwM1ip88XxIE0lz0QuxXo54VN25m3k=' 'sha256-CZY3xjYXSzrT2LMX6v2zDCqBRdCkSrpVlnAVJQR8Wnk=' 'sha256-P04sv6Gx4G2SNlC/BLire6NlKJJRrW+WA3R+vPzVvxk=' 'sha256-zAogWd5vbwCImiifLMlnZHJf+M+sm0NCvG8Hz3ueB1Y='; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; frame-src https://www.youtube-nocookie.com https://www.youtube.com;"
 
 # ----------------------------
 # Dead link redirects (removed posts)
