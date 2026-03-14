@@ -116,7 +116,7 @@ A: Retrieval-Augmented Generation (RAG) pipelines retrieve documents from a
 ---
 ## The Number That Should Bother You
 
-Depending on which scanner you trust and when they ran it, somewhere between 12,000 and 175,000 Ollama instances are reachable from the public internet with no authentication required. You send a request, you get a response. No token, no password, no nothing. Shodan puts the total number of running Ollama instances at around 270,000. A meaningful chunk of those are wide open.
+Depending on which scanner you trust and when they ran it, somewhere between 12,000 and 175,000 Ollama instances are reachable from the public internet with no authentication required. You send a request, you get a response. No token, no password, no nothing. Fuzzing Labs puts the total number of running Ollama instances at around 270,000 ([Fuzzing Labs, July 2025](https://fuzzinglabs.com/ollama-vulnerable-instances/)). A meaningful chunk of those are wide open.
 
 That’s not a misconfiguration story. Multiple contributors submitted pull requests to add authentication directly to Ollama. They were rejected. The project’s official position is that auth belongs in a proxy in front of it. Which is a reasonable design choice — and an absolutely predictable disaster when most people deploying it have never heard that guidance.
 
