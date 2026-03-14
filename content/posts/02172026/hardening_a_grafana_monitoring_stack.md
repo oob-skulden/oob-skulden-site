@@ -222,8 +222,6 @@ Every single vulnerability was wide open. Let's fix them.
 
 Full disclosure: the first attempt at this fix went sideways. Steps got combined, explanations got skipped, the approach derailed. The instruction I gave myself was blunt:
 
-> "DUDE, I need to start over. You didn't say that. Moving forward, we are going to do 1 step at a time, verify, and short explanation of what we are doing."
-
 That single moment established the methodology for the entire project. Every chapter that follows exists because of that reset.
 
 ### The Actual Fix
