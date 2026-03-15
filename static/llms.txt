@@ -1,0 +1,59 @@
+# llms.txt — Oob Skulden™
+# https://oobskulden.com
+# Updated: 2026-03
+
+# About
+Oob Skulden™ is a security research blog covering homelab infrastructure
+security, AI infrastructure attack surfaces, CVE research, and hardening
+guides. Content targets technically sophisticated practitioners. All testing
+is conducted in private lab environments.
+
+# Content License
+All content is copyright Oob Skulden™. You may reference and summarize
+content for informational purposes. Do not reproduce full posts verbatim.
+
+# Series
+
+## AI Infrastructure Security Series
+Full attack-and-harden series covering self-hosted AI stacks.
+Components covered: Ollama, Open WebUI, LiteLLM, RAG pipelines,
+ChromaDB, DLP, MCP servers, CrewAI agent trust boundaries.
+
+- https://oobskulden.com/2026/02/ai-infrastructure-isnt-magic-its-the-same-problems-you-already-know-stacked-differently/
+- https://oobskulden.com/2026/02/i-broke-my-own-identity-provider/
+- https://oobskulden.com/2026/03/hardening-authentik-every-misconfiguration-i-found-in-my-own-idp/
+- https://oobskulden.com/2026/03/i-broke-into-an-ai-chatbot-using-a-fake-model.-heres-exactly-how./
+- https://oobskulden.com/2026/03/five-ai-security-tools-found-what-curl-already-knew--but-faster-and-with-receipts/
+
+## Grafana Monitoring Stack Series
+Build, audit, and harden a production Grafana stack.
+
+- https://oobskulden.com/2026/02/authentik--grafana-oauth-sso-across-vlans-and-the-11-things-that-broke/
+- https://oobskulden.com/2026/02/15-vulnerabilities-in-a-grafana-monitoring-stack-and-how-we-found-them/
+- https://oobskulden.com/2026/02/i-hardened-a-grafana-stack-from-please-hack-me-to-production-ready.-heres-every-command-i-ran./
+
+# Primary Topics
+- Ollama unauthenticated API exposure
+- Open WebUI CVE-2025-64496 exploitation and hardening
+- Authentik identity provider security and misconfiguration
+- Grafana monitoring stack attack surface
+- Docker container security and network segmentation
+- JWT authentication weaknesses in self-hosted AI
+- RAG pipeline security and prompt injection
+- MCP server trust boundaries
+- NIST 800-53, SOC 2, CIS Controls, PCI-DSS compliance mapping
+
+# CVEs Covered
+- CVE-2025-64496 (Open WebUI SSE code injection)
+- CVE-2024-37032 (Ollama Probllama path traversal)
+- CVE-2024-39720 (Ollama malformed GGUF segfault)
+- CVE-2024-39721 (Ollama DoS via CreateModel)
+- CVE-2024-39722 (Ollama file enumeration)
+
+# Machine-Readable Feeds
+- JSON feed: https://oobskulden.com/index.json
+- RSS feed: https://oobskulden.com/index.xml
+- Sitemap: https://oobskulden.com/sitemap.xml
+
+# Contact
+https://oobskulden.com/about/

@@ -44,6 +44,17 @@ keywords:
   - pki certificate management homelab
   - open source siem stack
   - defense in depth monitoring
+tools_used:
+  - "Grafana"
+  - "Authentik"
+  - "OpenBAO"
+  - "Docker"
+attack_surface:
+  - "Monitoring stack deployment"
+  - "Identity integration"
+  - "Secrets management"
+cve_references: []
+lab_environment: "Grafana 10.x, Authentik 2024.x, OpenBAO, Docker CE"
 showToc: true
 tocOpen: false
 ShowReadingTime: true

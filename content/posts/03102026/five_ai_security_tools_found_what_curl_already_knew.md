@@ -28,6 +28,15 @@ keywords:
   - open webui CVE-2025-64496
   - llm bypass rate measurement
   - repeatable ai security baseline
+tools_used:
+  - "Ollama"
+  - "Docker"
+  - "curl"
+attack_surface:
+  - "Unauthenticated API exposure"
+  - "AI security tooling evaluation"
+cve_references: []
+lab_environment: "Ollama 0.1.33, Docker CE 29.3.0"
 showToc: true
 tocOpen: false
 ShowReadingTime: true

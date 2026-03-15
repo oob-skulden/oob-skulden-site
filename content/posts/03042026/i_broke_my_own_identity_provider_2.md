@@ -32,6 +32,14 @@ keywords:
   - authentik password policy hardening
   - authentik metrics endpoint authentication
   - authentik blueprint API security
+tools_used:
+  - "Authentik"
+  - "Docker"
+attack_surface:
+  - "Identity provider misconfiguration"
+  - "OAuth security"
+cve_references: []
+lab_environment: "Authentik 2024.x, Docker CE 29.3.0"
 showToc: true
 tocOpen: false
 ShowReadingTime: true

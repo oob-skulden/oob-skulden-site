@@ -1,0 +1,32 @@
+{{- $pages := where site.RegularPages "Type" "in" site.Params.mainSections -}}
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": {{ site.Title | jsonify }},
+  "home_page_url": {{ site.BaseURL | jsonify }},
+  "feed_url": {{ (print site.BaseURL "index.json") | jsonify }},
+  "description": {{ site.Params.description | jsonify }},
+  "authors": [{"name": "Oob Skulden™", "url": "https://oobskulden.com/about/"}],
+  "items": [
+    {{- range $index, $page := $pages }}
+    {{- if $index }},{{ end }}
+    {
+      "id": {{ $page.Permalink | jsonify }},
+      "url": {{ $page.Permalink | jsonify }},
+      "title": {{ $page.Title | jsonify }},
+      "summary": {{ $page.Description | jsonify }},
+      "date_published": {{ $page.Date.Format "2006-01-02T15:04:05Z07:00" | jsonify }},
+      "date_modified": {{ $page.Lastmod.Format "2006-01-02T15:04:05Z07:00" | jsonify }},
+      "tags": {{ $page.Params.tags | jsonify }},
+      "content_html": {{ $page.Content | jsonify }},
+      "extra": {
+        "tools_used": {{ $page.Params.tools_used | jsonify }},
+        "attack_surface": {{ $page.Params.attack_surface | jsonify }},
+        "cve_references": {{ $page.Params.cve_references | jsonify }},
+        "lab_environment": {{ $page.Params.lab_environment | jsonify }},
+        "series": {{ $page.Params.series | jsonify }},
+        "proficiency_level": {{ $page.Params.proficiencyLevel | default "Advanced" | jsonify }}
+      }
+    }
+    {{- end }}
+  ]
+}

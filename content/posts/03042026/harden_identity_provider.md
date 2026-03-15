@@ -40,6 +40,15 @@ ShowReadingTime: true
 ShowBreadCrumbs: true
 ShowPostNavLinks: true
 ShowShareButtons: true
+tools_used:
+  - "Authentik"
+  - "Docker"
+  - "HAProxy"
+attack_surface:
+  - "Identity provider hardening"
+  - "SSO misconfiguration"
+cve_references: []
+lab_environment: "Authentik 2024.x, Docker CE 29.3.0"
 showToc: true
 TocOpen: false
 ---

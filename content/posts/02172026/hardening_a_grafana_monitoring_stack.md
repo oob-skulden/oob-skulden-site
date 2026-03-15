@@ -32,6 +32,16 @@ keywords:
   - prometheus exposed endpoints
   - grafana rate limiting
   - openbao secrets grafana
+tools_used:
+  - "Grafana"
+  - "Prometheus"
+  - "Docker"
+  - "ModSecurity"
+attack_surface:
+  - "Grafana hardening"
+  - "Monitoring stack security"
+cve_references: []
+lab_environment: "Grafana 10.x, Prometheus 2.x, Docker CE"
 showToc: true
 tocOpen: false
 ShowReadingTime: true

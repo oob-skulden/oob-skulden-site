@@ -33,6 +33,25 @@ keywords:
   - homelab AI infrastructure audit
   - open webui persistent backdoor API key
   - ollama model poisoning
+tools_used:
+  - "Open WebUI"
+  - "Ollama"
+  - "Docker"
+  - "Python"
+  - "PyJWT"
+attack_surface:
+  - "SSE code injection"
+  - "JWT theft"
+  - "Tools API RCE"
+  - "Container pivot"
+  - "JWT forgery"
+cve_references:
+  - "CVE-2025-64496"
+  - "CVE-2024-37032"
+  - "CVE-2024-39720"
+  - "CVE-2024-39721"
+  - "CVE-2024-39722"
+lab_environment: "Open WebUI v0.6.33, Ollama 0.1.33, Docker CE 29.3.0"
 showToc: true
 tocOpen: false
 ShowReadingTime: true

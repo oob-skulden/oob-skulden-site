@@ -44,6 +44,17 @@ schema:
   author: "Oob Skulden"
   publisher: "Oob Skulden"
   proficiencyLevel: Advanced
+tools_used:
+  - "Ollama"
+  - "Open WebUI"
+  - "LiteLLM"
+  - "ChromaDB"
+attack_surface:
+  - "AI infrastructure threat modeling"
+  - "RAG pipeline security"
+cve_references:
+  - "CVE-2025-64496"
+lab_environment: "Conceptual -- no specific versions"
 showToc: true
 tocOpen: false
 ShowReadingTime: true

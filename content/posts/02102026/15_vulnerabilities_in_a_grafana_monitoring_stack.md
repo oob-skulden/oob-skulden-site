@@ -41,6 +41,15 @@ keywords:
   - oauth token interception
   - docker capability audit
   - monitoring infrastructure attack surface
+tools_used:
+  - "Grafana"
+  - "Prometheus"
+  - "Docker"
+attack_surface:
+  - "Grafana attack surface"
+  - "Monitoring stack vulnerabilities"
+cve_references: []
+lab_environment: "Grafana 10.x, Prometheus 2.x, Docker CE"
 showToc: true
 tocOpen: false
 ShowReadingTime: true

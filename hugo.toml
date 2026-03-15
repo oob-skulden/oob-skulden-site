@@ -23,6 +23,16 @@ series = "series"
 tag = "tags"
 category = "categories"
 
+[outputs]
+  home = ["HTML", "RSS", "JSON"]
+  page = ["HTML"]
+  section = ["HTML", "RSS"]
+  taxonomy = ["HTML"]
+  term = ["HTML", "RSS"]
+  series = ["HTML", "RSS"]
+  tag = ["HTML", "RSS"]
+  category = ["HTML", "RSS"]
+
 # Posts will be like: /2024/12/my-post-title/
 # The list page is still /posts/
 [permalinks]
@@ -55,9 +65,6 @@ Practical security for home labbers. Open source tools. Self-hosted architecture
 
 **No theory. Vendor-agnostic. Just working solutions.**
 """
-
-
-
 
 [params.label]
 text = "Oob Skulden"
