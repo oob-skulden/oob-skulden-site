@@ -19,11 +19,36 @@
       var url = block.getAttribute('data-url');
       var btn = block.querySelector('.ai-walkthrough-btn');
       var confirm = block.querySelector('.ai-walkthrough-confirm');
+      var toggle = block.querySelector('.ai-walkthrough-toggle');
+      var preview = block.querySelector('.ai-walkthrough-preview');
 
       if (!btn || !url) return;
 
+      var prompt = buildPrompt(url);
+
+      if (preview) {
+        preview.textContent = prompt;
+      }
+
+      if (toggle && preview) {
+        ['click', 'touchend'].forEach(function (evt) {
+          toggle.addEventListener(evt, function (e) {
+            e.preventDefault();
+            var expanded = preview.classList.contains('ai-walkthrough-preview--visible');
+            if (expanded) {
+              preview.classList.remove('ai-walkthrough-preview--visible');
+              toggle.textContent = 'inspect prompt';
+              toggle.setAttribute('aria-expanded', 'false');
+            } else {
+              preview.classList.add('ai-walkthrough-preview--visible');
+              toggle.textContent = 'collapse prompt';
+              toggle.setAttribute('aria-expanded', 'true');
+            }
+          });
+        });
+      }
+
       btn.addEventListener('click', function () {
-        var prompt = buildPrompt(url);
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(prompt).then(function () {
             showConfirm(confirm, btn);

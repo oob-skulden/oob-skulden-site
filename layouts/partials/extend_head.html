@@ -31,6 +31,13 @@
   margin-bottom: 0.2rem;
   font-size: 0.9rem;
 }
+.ai-walkthrough-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
 .ai-walkthrough-btn {
   background: #1a1a2e;
   color: #4a9eff;
@@ -51,6 +58,37 @@
   color: #4aff7a;
   border-color: #4aff7a;
 }
+.ai-walkthrough-toggle {
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
+}
+.ai-walkthrough-toggle:hover {
+  color: #888;
+}
+.ai-walkthrough-preview {
+  display: none;
+  margin: 0.75rem 0 0 0;
+  padding: 0.75rem 1rem;
+  background: #0a0a0a;
+  border: 1px solid #222;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: #aaa;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
+}
+.ai-walkthrough-preview--visible {
+  display: block;
+}
 .ai-walkthrough-confirm {
   font-size: 0.78rem;
   color: #4aff7a;
@@ -59,7 +97,7 @@
 }
 </style>
 
-<script src="/js/ai-walkthrough.js" defer></script>
+<script src="/js/ai-walkthrough.js"></script>
 
 {{- if and .IsPage (eq .Type "posts") }}
 <script type="application/ld+json">
