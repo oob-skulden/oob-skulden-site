@@ -112,6 +112,8 @@ A: Retrieval-Augmented Generation (RAG) pipelines retrieve documents from a
 > **CVE Disclosure Note:** This post references CVE-2025-64496 affecting Open WebUI. This vulnerability has been publicly disclosed. Check the [NVD entry](https://nvd.nist.gov) and your installed version before proceeding. Patch before deploying in any environment handling real data.
 > 
 > **Scope:** This series covers open-source, self-hosted, homelab infrastructure only. It does not address enterprise cloud architectures, managed AI services, or organizational security programs.
+{{< ai-walkthrough >}}
+
 
 ---
 ## The Number That Should Bother You
