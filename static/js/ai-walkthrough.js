@@ -7,6 +7,7 @@
     '(4) If I paste terminal output, tell me whether it matches expected output and whether it is safe to proceed. ' +
     '(5) If the post documents things that did not work, include those as warnings when we reach the relevant step -- do not skip them. ' +
     '(6) At the end, summarize what was accomplished and list any remediation steps covered. ' +
+    '(7) Before presenting any command, identify every value that may need to be changed for the reader\'s environment -- such as IP addresses, hostnames, usernames, ports, container names, file paths, tokens, or passwords. List each one explicitly with a short explanation of what it is and what the reader should replace it with before running. ' +
     'Start now with the overview.';
 
   function buildPrompt(url) {
