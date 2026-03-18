@@ -2,7 +2,7 @@
 title: "We Added PII Masking to Our AI Stack. Here's Exactly What Happened."
 date: 2026-03-17T12:00:00-05:00
 draft: false
-author: "Oob Skulden™"
+author: "Oob Skulden(TM)"
 description: "Presidio and LiteLLM deployed as a PII masking layer on an Ollama stack -- every undocumented env var, every silent failure, and the one-liner that proves the DLP never fired on real traffic. Six confirmed findings, zero service failures."
 tags:
   - AI Infrastructure
@@ -435,34 +435,15 @@ Empty. Presidio was never called. Not once. The gap is documented for 3.3B.
 
 [![PII Data Flow -- Where masking actually happens and where it doesn't](/images/ep3.3_data-flow.jpg)](/images/ep3.3_data-flow.jpg)
 
-### Compliance State — What This Build Actually Demonstrates
-
-A deployed DLP layer that never fires on real traffic is not a passing control. It's a documented control failure. Here's what each finding maps to:
-
-| Finding | Severity | NIST 800-53 | SOC 2 | PCI-DSS v4.0 | CIS Controls | OWASP LLM |
-|---|---|---|---|---|---|---|
-| `default_on` not enforced — guardrail bypassed on all UI traffic | HIGH | SA-11, CM-6, SI-12 | CC4.1, P4.1 | Req 12.3.2, Req 3.4.1 | CIS 3.11 | LLM06 |
-| Open WebUI writes to `webui.db` before gateway — unmasked PII at rest | HIGH | SC-28, PM-25 | P4.1, CC6.1 | Req 3.3.1, Req 3.4.1 | CIS 3.1, 3.11 | LLM06 |
-| Two model paths — local Ollama bypasses DLP entirely | HIGH | AC-4, SC-7 | CC6.6 | Req 1.3.2, Req 3.4.1 | CIS 13.4 | LLM06 |
-| Unauthenticated Presidio API endpoints on lab network | MEDIUM | AC-3, IA-3 | CC6.1, CC6.6 | Req 8.2.1, Req 1.3.1 | CIS 6.1, 12.2 | LLM06 |
-| `UsSsnRecognizer` gap — SSN format not detected | MEDIUM | SI-10 | CC6.1 | Req 3.3.1 | CIS 3.1 | LLM06 |
-| No container restart policy — controls go offline silently | LOW | SI-17, CP-10 | A1.2 | Req 12.3.4 | CIS 4.1 | — |
-
-**The specific control failures:**
-
-**SA-11 / CM-6 / Req 12.3.2** — You implemented a compensating control (`default_on: true`) and confirmed it was configured. You did not verify it was functioning as documented. That gap — between "configured" and "effective" — is exactly what these controls require you to close. A risk analysis or testing requirement, not just a configuration checkbox.
-
-**SC-28 / Req 3.4.1** — Sensitive data is stored at rest in `webui.db` without encryption, and without masking, regardless of the gateway configuration. The control doesn't fail because the gateway failed — it fails because the storage event happens upstream of the gateway entirely.
-
-**AC-4 / Req 1.3.2** — Information flow enforcement requires that the defined flow policy (all PII routes through the masking layer) is actually enforced at every path, not just on some model selections. The dual-path model selector violates the flow policy structurally.
-
-**SI-17 / CP-10 / A1.2** — Containers with no restart policy create silent availability failures. When LiteLLM crashed after 35 hours, the DLP layer went offline with no alert, no failover, and no indication to users that masking was no longer running. This is a resilience and recovery gap independent of the `default_on` bug.
-
-The compliance summary for this build: six findings, four of which represent HIGH-severity control failures against frameworks commonly used in regulated environments. None require a successful exploit to document — the configuration state alone is the finding.
+**NIST 800-53:** SI-12 (Information Management), SC-28 (Protection of Information at Rest), PM-25 (Minimization of PII)
+**SOC 2:** P4.1 (Personal Information Use), CC6.1 (Logical Access)
+**PCI-DSS v4.0:** Req 3.3.1 (Sensitive data retention), Req 3.4.1 (Stored data rendered unreadable)
+**CIS Controls:** CIS 3.1 (Data Management Process), CIS 3.11 (Encrypt Sensitive Data at Rest)
+**OWASP LLM Top 10:** LLM06 (Sensitive Information Disclosure)
 
 > *All testing performed in a controlled lab environment on personally owned hardware. For educational and defensive security research purposes only.*
 
-> *© 2026 Oob Skulden™ | AI Infrastructure Security Series | Episode 3.3*
+> *(c) 2026 Oob Skulden(TM) | AI Infrastructure Security Series | Episode 3.3*
 
 *Next: Episode 3.3B -- The DLP is deployed. Here's where the PII went anyway.*
 
@@ -532,7 +513,7 @@ Setting `PORT=3000` got a worker running. But the health check still hung. Diffe
 
 The worker existed but was sleeping with 21MB of RAM and a deleted socket file in its file descriptors. This is Gunicorn's sync worker deadlock: the worker spawns and starts loading `create_app()`, which initializes the spaCy NLP models. This takes 20-40 seconds. During that initialization, a health check request arrives. The sync worker can't handle it -- it's busy. The health check sits waiting. `create_app()` finishes. The worker tries to respond to the health check. The health check connection has timed out. The worker is now in a state where it's alive but not processing anything.
 
-The fix is `WORKER_CLASS=gevent`. The gevent async worker handles health checks concurrently with model initialization — spaCy loads in the background while health checks are answered in the foreground. The container goes from this:
+The fix is `WORKER_CLASS=gevent`. The gevent async worker handles health checks concurrently with model initialization -- spaCy loads in the background while health checks are answered in the foreground. The container goes from this:
 
 ```text
 Starting gunicorn...
@@ -651,7 +632,7 @@ The guardrail fires correctly when the client explicitly requests it:
 }
 ```
 
-Without that field: no masking, no error, no indication anything was skipped. Open WebUI does not include this field — it sends standard OpenAI-compatible requests with no guardrails key. There's an open GitHub issue confirming this is a bug. The fix lands in later versions. For now, `default_on: true` is aspirational in v1.57.3.
+Without that field: no masking, no error, no indication anything was skipped. Open WebUI does not include this field -- it sends standard OpenAI-compatible requests with no guardrails key. There's an open GitHub issue confirming this is a bug. The fix lands in later versions. For now, `default_on: true` is aspirational in v1.57.3.
 
 This is a genuine security gap, not a lab artifact. Any client -- a script, a second application, a developer hitting the endpoint -- that doesn't include the guardrails field bypasses Presidio entirely on every request.
 
@@ -1046,6 +1027,6 @@ docker run -d \
 
 > *This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization.*
 
-*© 2026 Oob Skulden™ | AI Infrastructure Security Series | Episode 3.3*
+*(c) 2026 Oob Skulden(TM) | AI Infrastructure Security Series | Episode 3.3*
 
 *Next: Episode 3.3B -- Five things that should mask your PII. Here's what actually happened.*
