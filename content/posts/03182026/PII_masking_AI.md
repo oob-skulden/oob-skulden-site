@@ -2,8 +2,8 @@
 title: "We Added PII Masking to Our AI Stack. Here's Exactly What Happened."
 date: 2026-03-17T12:00:00-05:00
 draft: false
-author: "Oob Skuldenâ„¢"
-description: "Presidio and LiteLLM deployed as a PII masking layer on an Ollama stack -- every undocumented env var, every silent failure, and the one-liner that proves the DLP never fired on real traffic. Three confirmed gaps, six attack surface findings, zero service failures."
+author: "Oob Skulden™"
+description: "Presidio and LiteLLM deployed as a PII masking layer on an Ollama stack -- every undocumented env var, every silent failure, and the one-liner that proves the DLP never fired on real traffic. Six confirmed findings, zero service failures."
 tags:
   - AI Infrastructure
   - LiteLLM
@@ -443,7 +443,7 @@ Empty. Presidio was never called. Not once. The gap is documented for 3.3B.
 
 > *All testing performed in a controlled lab environment on personally owned hardware. For educational and defensive security research purposes only.*
 
-> *Â© 2026 Oob Skuldenâ„¢ | AI Infrastructure Security Series | Episode 3.3*
+> *© 2026 Oob Skulden™ | AI Infrastructure Security Series | Episode 3.3*
 
 *Next: Episode 3.3B -- The DLP is deployed. Here's where the PII went anyway.*
 
@@ -513,7 +513,7 @@ Setting `PORT=3000` got a worker running. But the health check still hung. Diffe
 
 The worker existed but was sleeping with 21MB of RAM and a deleted socket file in its file descriptors. This is Gunicorn's sync worker deadlock: the worker spawns and starts loading `create_app()`, which initializes the spaCy NLP models. This takes 20-40 seconds. During that initialization, a health check request arrives. The sync worker can't handle it -- it's busy. The health check sits waiting. `create_app()` finishes. The worker tries to respond to the health check. The health check connection has timed out. The worker is now in a state where it's alive but not processing anything.
 
-The fix is `WORKER_CLASS=gevent`. Async workers handle multiple things simultaneously. With gevent, spaCy loads and health checks are answered concurrently. The container goes from this:
+The fix is `WORKER_CLASS=gevent`. The gevent async worker handles health checks concurrently with model initialization — spaCy loads in the background while health checks are answered in the foreground. The container goes from this:
 
 ```text
 Starting gunicorn...
@@ -632,7 +632,7 @@ The guardrail fires correctly when the client explicitly requests it:
 }
 ```
 
-Without that field: no masking, no error, no indication anything was skipped. There's an open GitHub issue confirming this is a bug. The fix lands in later versions. For now, `default_on: true` is aspirational in v1.57.3.
+Without that field: no masking, no error, no indication anything was skipped. Open WebUI does not include this field — it sends standard OpenAI-compatible requests with no guardrails key. There's an open GitHub issue confirming this is a bug. The fix lands in later versions. For now, `default_on: true` is aspirational in v1.57.3.
 
 This is a genuine security gap, not a lab artifact. Any client -- a script, a second application, a developer hitting the endpoint -- that doesn't include the guardrails field bypasses Presidio entirely on every request.
 
@@ -713,7 +713,7 @@ Nobody masked those. Nothing ever will, as long as Open WebUI writes to SQLite b
 
 ### The Dual Backend -- Adding the Desktop GPU
 
-The NUC runs CPU-only inference at around 6 tokens per second. That's fine for security testing but painful for anything involving waiting for model responses on camera. The Windows desktop at `192.168.38.215` has an RTX 3080Ti and Ollama already running from an earlier episode.
+The NUC runs CPU-only inference at around 6 tokens per second. That's fine for security testing but painful for anything involving waiting for model responses on camera. The desktop at `192.168.38.215` has an RTX 3080Ti and Ollama already running from an earlier episode.
 
 The question was whether LiteLLM could route to both simultaneously. It can. Point different model names at different `api_base` URLs:
 
@@ -1027,6 +1027,6 @@ docker run -d \
 
 > *This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization.*
 
-*Â© 2026 Oob Skuldenâ„¢ | AI Infrastructure Security Series | Episode 3.3*
+*© 2026 Oob Skulden™ | AI Infrastructure Security Series | Episode 3.3*
 
 *Next: Episode 3.3B -- Five things that should mask your PII. Here's what actually happened.*
