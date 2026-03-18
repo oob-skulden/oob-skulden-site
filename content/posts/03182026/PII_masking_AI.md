@@ -2,7 +2,7 @@
 title: "We Added PII Masking to Our AI Stack. Here's Exactly What Happened."
 date: 2026-03-17T12:00:00-05:00
 draft: false
-author: "Oob Skulden(TM)"
+author: "Oob Skulden™"
 description: "Presidio and LiteLLM deployed as a PII masking layer on an Ollama stack -- every undocumented env var, every silent failure, and the one-liner that proves the DLP never fired on real traffic. Six confirmed findings, zero service failures."
 tags:
   - AI Infrastructure
@@ -384,7 +384,7 @@ docker logs litellm 2>&1 | grep "Making request to"
 
 Empty output means the DLP never fired. That's what we got.
 
-One important caveat visible in these commands: the `"guardrails": ["presidio-pii-mask"]` field in the request body. This is required. The `default_on: true` setting in the config is parsed correctly and appears in the startup logs, but it does not cause the guardrail to fire on requests that don't explicitly include this field. This is a confirmed bug in v1.57.3 -- there's an open GitHub issue. The practical consequence: any client that doesn't include the guardrails field bypasses Presidio silently, with no error and no indication that masking didn't happen.
+One important caveat visible in these commands: the `"guardrails": ["presidio-pii-mask"]` field in the request body. This is required. The `default_on: true` setting in the config is parsed correctly and appears in the startup logs, but it does not cause the guardrail to fire on requests that don't explicitly include this field. This is a confirmed bug in v1.57.3 -- there's an [open GitHub issue](https://github.com/BerriAI/litellm/issues/18363). The practical consequence: any client that doesn't include the guardrails field bypasses Presidio silently, with no error and no indication that masking didn't happen.
 
 ## Step 4: Connect Open WebUI to LiteLLM
 
@@ -443,7 +443,7 @@ Empty. Presidio was never called. Not once. The gap is documented for 3.3B.
 
 > *All testing performed in a controlled lab environment on personally owned hardware. For educational and defensive security research purposes only.*
 
-> *(c) 2026 Oob Skulden(TM) | AI Infrastructure Security Series | Episode 3.3*
+> *© 2026 Oob Skulden™ | AI Infrastructure Security Series | Episode 3.3*
 
 *Next: Episode 3.3B -- The DLP is deployed. Here's where the PII went anyway.*
 
@@ -544,7 +544,7 @@ None of this is in the documentation.
 
 Once the containers were running, the first API test hit a 404. The official Presidio Docker installation guide maps the Analyzer to host port 5001 and the Anonymizer to host port 5002, then sends the `/analyze` test request to port 5002 -- the Anonymizer port. Which has no `/analyze` endpoint.
 
-The issue is documented on GitHub and has been open for over a year.
+The issue is [documented on GitHub](https://github.com/microsoft/presidio/issues/1363) and has been open for over a year.
 
 The correct ports: Analyzer is 5001, Anonymizer is 5002. Beyond that, there's a second port confusion that costs more time. When LiteLLM talks to Presidio inside Docker, it uses the container's internal port -- `http://presidio-analyzer:3000` -- not the host-mapped port 5001. The `-p 5001:3000` flag is for your terminal on the host. Container-to-container traffic goes directly to port 3000 via Docker's internal DNS.
 
@@ -572,7 +572,7 @@ Tried again with explicit context:
 
 Still one entity. Still just the name.
 
-Presidio's `UsSsnRecognizer` uses a regex pattern combined with surrounding context words to boost confidence above the detection threshold. In this image version, `123-45-6789` doesn't score high enough regardless of context. The masking pipeline produces:
+Presidio's `UsSsnRecognizer` uses a regex pattern combined with surrounding context words to boost confidence above the detection threshold. In this image version, `123-45-6789` doesn't score high enough regardless of context. A [related weakness in the recognizer's delimiter validation logic](https://github.com/microsoft/presidio/issues/362) has been documented since 2020 -- the behavior we observed is consistent with that known gap. The masking pipeline produces:
 
 ```text
 Input:  "My name is Sarah Johnson and my SSN is 123-45-6789"
@@ -632,7 +632,7 @@ The guardrail fires correctly when the client explicitly requests it:
 }
 ```
 
-Without that field: no masking, no error, no indication anything was skipped. Open WebUI does not include this field -- it sends standard OpenAI-compatible requests with no guardrails key. There's an open GitHub issue confirming this is a bug. The fix lands in later versions. For now, `default_on: true` is aspirational in v1.57.3.
+Without that field: no masking, no error, no indication anything was skipped. Open WebUI does not include this field -- it sends standard OpenAI-compatible requests with no guardrails key. There's an [open GitHub issue](https://github.com/BerriAI/litellm/issues/18363) confirming this is a bug. The fix lands in later versions. For now, `default_on: true` is aspirational in v1.57.3.
 
 This is a genuine security gap, not a lab artifact. Any client -- a script, a second application, a developer hitting the endpoint -- that doesn't include the guardrails field bypasses Presidio entirely on every request.
 
@@ -994,6 +994,7 @@ docker run -d \
 | LiteLLM `default_on` guardrail bug -- model-level guardrails not firing | [github.com/BerriAI/litellm/issues/18363](https://github.com/BerriAI/litellm/issues/18363) |
 | CVE-2024-6825 -- LiteLLM RCE via post-call rules (v1.40.12) | [github.com/advisories/GHSA-53gh-p8jc-7rg8](https://github.com/advisories/GHSA-53gh-p8jc-7rg8) |
 | Presidio Docker port documentation inconsistency | [github.com/microsoft/presidio/issues/1363](https://github.com/microsoft/presidio/issues/1363) |
+| Presidio UsSsnRecognizer delimiter validation weakness (related recognizer gap) | [github.com/microsoft/presidio/issues/362](https://github.com/microsoft/presidio/issues/362) |
 
 ### Tools and Documentation
 
@@ -1027,6 +1028,6 @@ docker run -d \
 
 > *This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization.*
 
-*(c) 2026 Oob Skulden(TM) | AI Infrastructure Security Series | Episode 3.3*
+*© 2026 Oob Skulden™ | AI Infrastructure Security Series | Episode 3.3*
 
 *Next: Episode 3.3B -- Five things that should mask your PII. Here's what actually happened.*
