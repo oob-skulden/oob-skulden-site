@@ -100,6 +100,9 @@ Months later, that identity provider is running the same version, with the same 
 
 This is not a theoretical exercise. This is what I found.
 
+{{< youtube pnQDHHjT50U >}}
+
+
 I ran a complete live audit of Authentik 2025.12.3 — the open-source identity provider used by thousands of organizations — from a jump box on a separate VLAN, armed with nothing but pre-installed Linux tools. No Burp Suite. No Nuclei. No custom exploits. Just `curl`, `bash`, `python3` standard library, and a healthy dose of paranoia.
 
 The result: 10 out of 15 findings confirmed exploitable, including full Remote Code Execution from a non-superuser account, complete database compromise bypassing the application entirely, and a two-command path from Docker exec to god-mode administrative access. The entire chain — from first reconnaissance to full infrastructure compromise — took under 15 minutes.
