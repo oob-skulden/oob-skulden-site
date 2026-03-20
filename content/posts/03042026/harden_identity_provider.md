@@ -99,10 +99,13 @@ In Part 1 -- [I Broke My Own Identity Provider](https://oobskulden.com/2026/02/i
 
 Part 1 ended with a list of fixes. This article is those fixes -- every command, every gotcha, every dead end, and every verification step. The same four-phase methodology applies: Prove It, Break It, Harden It, Verify It. This article covers the Harden It and Verify It phases in full.
 
+{{< youtube pnQDHHjT50U >}}
+
 If you have not read Part 1, the finding references below link back to specific sections. You do not need Part 1 to follow this article, but the context makes the hardening decisions clearer.
 
 **What this article covers:**
 Chapter 1: Localhost bind (F-02) | Chapter 2: HAProxy headers, path blocking, rate limiting (F-01, F-03, F-04, F-06) | Chapter 3: .env permissions (F-07) | Chapter 4: OpenBAO AppRole secret injection (F-07) | Chapter 5: akadmin deactivation (F-12) | Chapter 6: Docker group removal and worker container hardening (F-10, F-12)
+
 
 ## What Was Fixed -- Quick Reference
 
