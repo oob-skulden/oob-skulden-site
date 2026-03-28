@@ -46,7 +46,7 @@ series_order: 5
 
 # ─── AUTHORSHIP & IDENTITY ──────────────────────────────────────────────────
 # author as a list enables PaperMod's multi-author schema.org output.
-author: ["Oob Skulden"]
+author: ["Oob Skulden™"]
 
 # canonicalURL prevents duplicate-content penalties if the post is
 # syndicated to Substack, Medium, or dev.to.
@@ -77,15 +77,11 @@ searchHidden: false
 ShowReadingTime: true
 ShowBreadCrumbs: true
 ShowPostNavLinks: true
-ShowWordCount: true
+ShowWordCount: false
 ShowRssButtonInSectionTermList: true
 UseHugoToc: true
 
 # ─── EDIT LINK ───────────────────────────────────────────────────────────────
-editPost:
-  URL: "https://github.com/oobskulden/oobskulden.com/content"
-  Text: "Suggest Changes"
-  appendFilePath: true
 ---
 
 > **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 103>
