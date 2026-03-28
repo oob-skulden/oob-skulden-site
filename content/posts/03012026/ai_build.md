@@ -56,16 +56,14 @@ canonicalURL: "https://oobskulden.com/posts/ep3-2a-build/"
 # images[0] is used by PaperMod for og:image and twitter:image when no
 # cover image is present. Provide an absolute URL once you have an image.
 # Recommended size: 1200x630px.
-images:
-  - "https://oobskulden.com/images/ep3-2a-lab-architecture.png"
 
 # ─── COVER IMAGE ─────────────────────────────────────────────────────────────
 cover:
-  image: "/images/ep3-2a-lab-architecture.png"
+  image: ""
   alt: "Open WebUI and Ollama lab stack architecture: NUC VM at 192.168.100.244 running Ollama 0.1.33 and Open WebUI v0.6.33 in Docker, connected to jump box at 192.168.50.10 and desktop GPU at 192.168.38.215"
   caption: "The vulnerable lab stack before the attacker arrives."
   relative: false
-  hidden: false
+  hidden: true
 
 # ─── PAPERMOD DISPLAY ────────────────────────────────────────────────────────
 showToc: true
