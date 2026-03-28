@@ -1,22 +1,34 @@
 ---
 title: "Before You Can Break It, You Have to Build It Wrong"
 date: 2026-03-03T00:00:00-06:00
-lastmod: 2026-03-01T00:00:00-06:00
-description: "How to deploy the intentionally vulnerable Open WebUI v0.6.33 and Ollama 0.1.33 lab stack from scratch on Debian 13 -- Docker install, compose file, account creation via API, workspace.tools permission hunting, and every gotcha that didn't make it into the attack writeup."
-summary: "Step-by-step build guide for the CVE-2025-64496 vulnerable lab stack: Ollama 0.1.33 with zero-auth API + Open WebUI v0.6.33 below the SSE code injection patch threshold. Covers Docker installation, compose configuration, admin and victim account setup, Direct Connections, and the env var that makes the RCE chain work."
+lastmod: 2026-03-03T00:00:00-06:00
+
+# ─── SEO ────────────────────────────────────────────────────────────────────
+# description feeds <meta name="description"> and Open Graph og:description.
+# Keep under 160 chars. Front-load the primary keyword.
+description: "Deploy the intentionally vulnerable Open WebUI v0.6.33 + Ollama 0.1.33 lab stack on Debian 13 from scratch -- Docker, compose file, API account setup, and every gotcha for CVE-2025-64496 lab reproduction."
+
+# summary feeds Hugo list pages and RSS. Can be longer than description.
+summary: "Step-by-step build guide for the CVE-2025-64496 vulnerable lab stack: Ollama 0.1.33 zero-auth API + Open WebUI v0.6.33 below the SSE code injection patch threshold. Covers Docker install on Debian 13, compose configuration with correct env vars, admin and victim account creation via API, Direct Connections setup, and the workspace.tools env var that makes the RCE chain work."
+
+# keywords feeds <meta name="keywords"> -- low direct ranking value but
+# used by some crawlers and helpful for internal site search (Fuse.js).
+# Order: primary term first, then long-tail, then related.
 keywords:
-  - open webui security
-  - ollama security
-  - CVE-2025-64496
-  - docker compose lab
-  - open webui docker install
-  - ollama docker
-  - self-hosted AI security
-  - AI infrastructure security
-  - open webui vulnerable version
-  - ollama zero auth
-  - open webui workspace tools
-  - homelab security
+  - open webui CVE-2025-64496
+  - ollama docker security lab
+  - open webui docker install debian
+  - ollama 0.1.33 zero auth
+  - open webui v0.6.33 vulnerable
+  - self-hosted AI security homelab
+  - docker compose open webui ollama
+  - open webui workspace tools permission
+  - AI infrastructure security lab
+  - CVE-2025-64496 reproduce
+  - ollama unauthenticated API
+  - open webui admin account API
+
+# ─── TAXONOMY ────────────────────────────────────────────────────────────────
 tags:
   - open-webui
   - ollama
@@ -24,13 +36,38 @@ tags:
   - docker
   - homelab
   - security-audit
+  - CVE-2025-64496
+  - debian
 categories:
   - AI Infrastructure Security
 series:
   - AI Infrastructure Security
 series_order: 5
-author: "Oob Skulden"
+
+# ─── AUTHORSHIP & IDENTITY ──────────────────────────────────────────────────
+# author as a list enables PaperMod's multi-author schema.org output.
+author: ["Oob Skulden"]
+
+# canonicalURL prevents duplicate-content penalties if the post is
+# syndicated to Substack, Medium, or dev.to.
 canonicalURL: "https://oobskulden.com/posts/ep3-2a-build/"
+
+# ─── OPEN GRAPH / TWITTER CARDS (GEO + SEO) ─────────────────────────────────
+# images[0] is used by PaperMod for og:image and twitter:image when no
+# cover image is present. Provide an absolute URL once you have an image.
+# Recommended size: 1200x630px.
+images:
+  - "https://oobskulden.com/images/ep3-2a-lab-architecture.png"
+
+# ─── COVER IMAGE ─────────────────────────────────────────────────────────────
+cover:
+  image: "/images/ep3-2a-lab-architecture.png"
+  alt: "Open WebUI and Ollama lab stack architecture: NUC VM at 192.168.100.244 running Ollama 0.1.33 and Open WebUI v0.6.33 in Docker, connected to jump box at 192.168.50.10 and desktop GPU at 192.168.38.215"
+  caption: "The vulnerable lab stack before the attacker arrives."
+  relative: false
+  hidden: false
+
+# ─── PAPERMOD DISPLAY ────────────────────────────────────────────────────────
 showToc: true
 TocOpen: true
 draft: false
@@ -45,17 +82,18 @@ ShowPostNavLinks: true
 ShowWordCount: true
 ShowRssButtonInSectionTermList: true
 UseHugoToc: true
-cover:
-  image: ""
-  alt: "Open WebUI and Ollama lab stack architecture diagram showing NUC VM at 192.168.100.244 with two Docker containers on a shared bridge network"
-  caption: "The vulnerable lab stack before the attacker arrives."
-  relative: false
-  hidden: false
+
+# ─── EDIT LINK ───────────────────────────────────────────────────────────────
 editPost:
   URL: "https://github.com/oobskulden/oobskulden.com/content"
   Text: "Suggest Changes"
   appendFilePath: true
 ---
+
+> **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 103>
+>
+> This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies >
+{{< ai-walkthrough >}}
 
 Every good heist movie starts the same way. The crew cases the joint. They study the layout, map the exits, figure out where the guards are and when they rotate. Nobody shows up with a blowtorch and a prayer.
 
@@ -65,16 +103,19 @@ But first, someone has to build the bank.
 
 This is that episode. No exploits. No CVEs. Just a fresh Debian 13 VM, two Docker containers, and enough deliberate misconfiguration to give 3.2B something worth breaking. If you have wondered what a "vulnerable by design" lab stack actually looks like to set up -- and specifically where the setup itself goes sideways -- you are in the right place.
 
+> **What this post covers:** Installing Docker on Debian 13, writing the correct `docker-compose.yml` for Ollama 0.1.33 and Open WebUI v0.6.33, creating admin and victim accounts via the Open WebUI API, enabling Direct Connections, and setting the `USER_PERMISSIONS_WORKSPACE_TOOLS_ACCESS` env var that makes the CVE-2025-64496 RCE chain reproducible. Every gotcha documented.
+
+
 ---
 
 ## What We Are Deploying
 
 The target is two containers on a single Docker bridge network. No reverse proxy. No TLS. No network segmentation. No authentication on the backend. This is exactly how the internet's 175,000+ exposed Ollama instances are configured right now.
 
-| Component | Version | Port | Auth |
-|---|---|---|---|
-| Ollama | 0.1.33 | 11434 | None |
-| Open WebUI | v0.6.33 | 3000 | Enabled (JWT) |
+| Component | Version | Port | Auth | CVE Status |
+|---|---|---|---|---|
+| Ollama | 0.1.33 | 11434 | None | Vulnerable (zero-auth, path traversal) |
+| Open WebUI | v0.6.33 | 3000 | Enabled (JWT) | Vulnerable (CVE-2025-64496, below v0.6.35 patch) |
 
 The version numbers are not accidents. According to SentinelOne Labs and Censys, approximately 175,000 Ollama instances were publicly reachable as of January 2026 -- of which 14,000+ had zero authentication enabled on the management API. Ollama 0.1.33 is the version found across a significant share of those zero-auth deployments. Open WebUI v0.6.33 sits one version below the patch threshold for CVE-2025-64496 -- the SSE code injection vulnerability that drives the entire 3.2B attack chain. The patch landed in v0.6.35. We are running v0.6.33. That gap is the whole story.
 
@@ -544,20 +585,47 @@ For anyone reproducing this build, here is every place we hit a wall.
 
 ## Frequently Asked Questions
 
-**Why are these specific versions used?**
-Ollama 0.1.33 is below the authentication patch threshold and matches versions found on 14,000+ real exposed instances. Open WebUI v0.6.33 is below the CVE-2025-64496 patch (v0.6.35). Both are intentional.
+<!-- FAQ structured data: answers are indexed by search engines and AI answer engines.
+     Each question/answer pair is designed to be self-contained and extractable. -->
 
-**Can I use newer versions for testing?**
-You can, but the 3.2B attack chain will not work as documented against patched versions. The whole point of the pinned versions is reproducibility.
+**Why are Ollama 0.1.33 and Open WebUI v0.6.33 specifically used for this lab?**
+These versions are pinned deliberately. Ollama 0.1.33 is below the authentication patch threshold and matches versions found running on 14,000+ zero-auth exposed instances in the wild as of January 2026. Open WebUI v0.6.33 is one version below the CVE-2025-64496 patch, which shipped in v0.6.35. Both are intentional -- the goal is a reproducible, documented attack chain, not a current production deployment.
 
-**Why does `workspace.tools` default to False?**
-It is a security default -- in a properly deployed multi-user environment, regular users probably should not have arbitrary code execution on the server. The problem is that "properly deployed" and "how most people actually deploy it" are different things. The 3.2B episode explores what happens when that default gets enabled.
+**Can I use newer versions of Ollama and Open WebUI for testing?**
+You can deploy newer versions, but the CVE-2025-64496 attack chain documented in Episode 3.2B will not work against patched versions. Ollama 0.7.0+ adds authentication options. Open WebUI v0.6.35+ blocks SSE execute events from Direct Connection servers. If you want to reproduce the full 3.2B chain, use the pinned versions.
 
-**Why is the JWT expiration set to 1h instead of -1?**
-Personal preference for this lab deployment -- it forces a re-authentication discipline that's closer to how a real deployment should behave. The 3.2B attack chain needs to run within that one-hour window, which is achievable in a single demo session. If you need tokens that survive across sessions -- for example, across multiple lab days -- set JWT Expiration to `-1` in Admin Settings. The Build State Summary table reflects the 1h setting used in this lab. The Open WebUI default is `-1` (never expire), which is the more dangerous configuration and the one documented in the 3.2B findings.
+**Why does `workspace.tools` default to False in Open WebUI v0.6.33?**
+It is a security default. In a properly deployed multi-user environment, regular users probably should not have the ability to run arbitrary Python code on the server backend. The problem is that "properly deployed" and "how most people actually deploy it" are different things -- and the default permission set is what ships to everyone. The 3.2B episode explores what happens when that default is enabled, either intentionally or because an admin changed it for convenience.
 
-**What is the difference between the NUC Ollama and the desktop Ollama?**
-The NUC runs the vulnerable version (0.1.33) and is the attack target. The desktop runs current stable (0.17.7) with GPU acceleration and is the fast inference backend. Never attack the desktop -- it is not the target.
+**How do you set `workspace.tools` to True for a user in Open WebUI v0.6.33?**
+In v0.6.33, workspace permissions are not stored in the database and cannot be set through the Admin UI's individual user edit dialog. They are computed at runtime from the `USER_PERMISSIONS_WORKSPACE_TOOLS_ACCESS` environment variable. Set it to `true` in `docker-compose.yml` and restart with `docker compose up -d --force-recreate`. This sets the default for all user-role accounts.
+
+**Why is `ENABLE_SIGNUP=false` not in the compose file?**
+In Open WebUI v0.6.33, `ENABLE_SIGNUP=false` blocks all signups including the very first admin account registration. The form accepts your input, posts to `/api/v1/auths/signup`, gets a `403` back, and shows no explanation. The correct approach for this version is to omit the flag from compose and disable signup through Admin Settings after the admin account exists.
+
+**What is the correct API endpoint to create users in Open WebUI when signup is disabled?**
+`POST /api/v1/auths/add` with an admin Bearer token. Not `/api/v1/auths/signup` (returns 403 when signup is disabled) and not `/api/v1/users/create` (returns Method Not Allowed). This is found by reading the router source: `grep -n "router.post" /app/backend/open_webui/routers/auths.py`.
+
+**Why is the JWT expiration set to 1h instead of -1 (never expire)?**
+Personal preference for this lab deployment -- it enforces re-authentication discipline closer to how a real deployment should behave. The 3.2B attack chain runs within a single hour-long session. If you need tokens to survive across multiple lab days, set JWT Expiration to `-1` in Admin Settings. The Open WebUI default is `-1` (never expire), which is the more dangerous configuration and the one documented as a finding in 3.2B.
+
+**What is the difference between the NUC Ollama and the desktop Ollama in this lab?**
+The NUC at 192.168.100.244 runs Ollama 0.1.33 -- it is the intentionally vulnerable attack target. The desktop at 192.168.38.215 runs Ollama 0.17.7 with an RTX 3080 Ti GPU at approximately 699 tok/sec -- it is the fast inference backend for demos. Do not run attack commands against the desktop. It is not the target and is not running vulnerable software.
+
+---
+
+## Key Takeaways
+
+For search engines, AI answer engines, and anyone skimming before they commit to the full read:
+
+- **Ollama 0.1.33 has zero authentication on all management API endpoints** -- any host that can reach port 11434 can enumerate models, pull new ones, delete existing ones, and trigger inference without credentials.
+- **Open WebUI v0.6.33 is below the CVE-2025-64496 patch threshold** -- SSE execute events from Direct Connection servers are not validated, enabling JavaScript execution in the victim's browser.
+- **`ENABLE_SIGNUP=false` in compose breaks the first admin registration** in v0.6.33. Omit it. Disable signup through the Admin UI after the admin account exists.
+- **`OLLAMA_BASE_URL=localhost` silently fails inside Docker** -- use the service name `ollama`, not localhost or an IP.
+- **Victim account creation requires `/api/v1/auths/add`** -- not `/signup` or `/users/create`. Found by reading the router source inside the running container.
+- **`workspace.tools` defaults to False** and is not stored in the database -- set it via `USER_PERMISSIONS_WORKSPACE_TOOLS_ACCESS=true` in the compose environment block.
+- **`docker compose up -d` will not pick up new environment variables without `--force-recreate`.**
+- **`/api/config` exposes the Open WebUI version unauthenticated** -- a scanner can confirm CVE-2025-64496 exposure in a single GET request.
 
 ---
 
