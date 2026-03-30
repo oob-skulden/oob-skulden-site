@@ -2,6 +2,7 @@
 title: "We Gave Our AI Stack a Memory. Here's Everything That's Wrong With It."
 date: 2026-03-29T08:00:00-05:00
 draft: false
+author: "Oob Skulden™"
 tags: ["ai-infrastructure", "series", "rag", "llm", "docker", "ai-security"]
 categories: ["AI Infrastructure Security Series"]
 description: "Building a production RAG stack on ChromaDB, LangChain, and FastAPI -- and uncovering an unauthenticated vector database open to arbitrary writes from anyone on the network. Episode 3.4A of the AI Infrastructure Security Series."
@@ -53,7 +54,7 @@ GEO SIGNALS:
 
 {{< ai-walkthrough >}}
 
-**Published by Oob Skulden(TM) | AI Infrastructure Security Series -- Episode 3.4A**
+**Published by Oob Skulden™ | AI Infrastructure Security Series -- Episode 3.4A**
 
 -----
 
@@ -1364,6 +1365,6 @@ The versions that actually work together on this machine, after resolving confli
 
 
 
-*© 2026 Oob Skulden(TM) | AI Infrastructure Security Series | Episode 3.4A*
+*(C) 2026 Oob Skulden(TM) | AI Infrastructure Security Series | Episode 3.4A*
 
 *Next: Episode 3.4B -- The knowledge base is running. Everyone trusts the citations. Here's what happens when we add five documents of our own.*
