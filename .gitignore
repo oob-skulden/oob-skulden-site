@@ -111,3 +111,7 @@ hugo.development.toml
 
 # Netlify local dev artifacts (only if using `netlify dev`)
 .netlify/
+# ============================================
+# Unpublished / Embargoed Drafts
+# ============================================
+content/posts/04152026/ats_security_research.md
