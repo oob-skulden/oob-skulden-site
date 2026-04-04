@@ -1,7 +1,7 @@
 ---
 title: "About"
 date: 2024-12-23
-lastmod: 2026-03-14
+lastmod: 2026-04-04
 draft: false
 showToc: false
 hidemeta: true
@@ -23,13 +23,13 @@ If you run a homelab and want to do security right from the start, this is for y
 
 ## What You'll Find
 
-Every article ships with working detection queries you can copy and adapt, complete remediation paths instead of just alerts, and honest tool evaluations that include limitations. Where it's relevant, posts map findings to compliance frameworks (NIST 800-53, SOC 2, PCI-DSS, CIS Controls) for educational reference. Everything is built on open-source and low-cost tools because cost is a design constraint, not an afterthought.
+Every article ships with working detection queries you can copy and adapt, complete remediation paths instead of just alerts, and honest tool evaluations that include limitations. Where relevant, posts map findings to compliance frameworks -- NIST 800-53, SOC 2, PCI-DSS, CIS Controls, and OWASP LLM Top 10 -- for educational reference. Everything is built on open-source and low-cost tools because cost is a design constraint, not an afterthought.
 
 ---
 
 ## The Approach
 
-Tools are evaluated based on what they actually do, how they fail, and how they fit into real environments -- not based on marketing copy. Every recommendation is tested in a live homelab before it gets published. There's no generic advice here. Specific tools, specific commands, specific outcomes.
+Tools are evaluated based on what they actually do, how they fail, and how they fit into real environments -- not based on marketing copy. Every recommendation is tested in a live homelab before it gets published. No generic advice. Specific tools, specific commands, specific outcomes.
 
 ---
 
@@ -37,15 +37,19 @@ Tools are evaluated based on what they actually do, how they fail, and how they 
 
 Oob Skulden is a pseudonym.
 
-Behind it is over 20+ years across networking, systems administration, database engineering, and security -- from early enterprise environments to modern infrastructure -- with the last 15+ years focused on security under real-world constraints: limited budgets, small teams, and competing priorities.
+Twenty-five years across enterprise environments. The work has spanned network architecture, systems engineering, database infrastructure, cloud platforms (AWS, Azure, GovCloud), and security -- with the last decade focused on security in a regulated industry context where compliance frameworks aren't academic exercises.
 
-The homelab where everything gets tested is extensive. When something appears on this site, it has already been built, broken, and rebuilt. The articles reflect systems that actually run, including the mistakes made building them and the lessons learned fixing them.
+The security work includes architecture review, vulnerability management, cloud security, and identity -- the kind of work where the threat model is real, the audit is coming, and "we'll fix it later" isn't an option.
+
+This is the first public research series. Everything published here is developed independently, on personal equipment, in a homelab built specifically to break things safely. The lab runs across multiple VLANs and hosts, mixing open-source tooling with custom-built components -- because the best way to understand an attack surface is to own the entire stack.
+
+When something appears on this site, it has already been built, broken, and rebuilt. The articles reflect systems that actually run, including the mistakes made building them and the lessons learned fixing them.
 
 ---
 
 ## Behind the Site
 
-This site is static by design. The work behind it is not. Articles are backed by homelab experiments, working tools, detection logic, and open-source research. Infrastructure and tooling evolve continuously and are validated before anything is published.
+Static by design. The work behind it is not. Articles are backed by homelab experiments, working detection logic, and open-source research validated before anything is published.
 
 ---
 
