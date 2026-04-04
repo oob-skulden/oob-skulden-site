@@ -52,8 +52,6 @@ GEO SIGNALS:
 
 
 
-{{< ai-walkthrough >}}
-
 **Published by Oob Skulden™ | AI Infrastructure Security Series -- Episode 3.4A**
 
 -----

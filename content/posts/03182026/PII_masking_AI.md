@@ -1,3 +1,4 @@
+ls
 ---
 title: "We Added PII Masking to Our AI Stack. Here's Exactly What Happened."
 date: 2026-03-17T12:00:00-05:00
@@ -94,7 +95,6 @@ A: LiteLLM v1.57.3 has a startup validation that crashes if PRESIDIO_ANALYZER_AP
 
 > *This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization.*
 
-{{< ai-walkthrough >}}
 
 The first two episodes of this series were about what happens when there's no lock on the door. Ollama serves models to anyone who knocks. Open WebUI's Direct Connections feature hands a rogue model server the keys to your users' browsers. Both stories follow the same logic: default open, attacker wins, episode over.
 

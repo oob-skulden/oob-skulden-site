@@ -89,7 +89,6 @@ A: Not reliably. Presidio's phone number recognizer scores phone numbers at 0.4,
 >
 > *This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies are derived from publicly available frameworks, published CVE advisories, and open-source tool documentation. All tools referenced are free, open-source, and publicly available.*
 
-{{< ai-walkthrough >}}
 
 **Published by Oob Skulden™ | AI Infrastructure Security Series -- Episode 3.3B**
 
