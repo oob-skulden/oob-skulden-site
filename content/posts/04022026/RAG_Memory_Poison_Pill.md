@@ -751,7 +751,7 @@ Twenty-three tests. Seventeen confirmed. Four infrastructure fixes required befo
 | Component | Version | Notes |
 |-----------|---------|-------|
 | ChromaDB | 1.0.0 | v2 API -- all /api/v1/ paths deprecated |
-| LangChain-core | 0.3.7 | Confirmed vulnerable to CVE-2025-68664 |
+| LangChain-core | 0.3.7 | Below patched threshold for CVE-2025-68664 (fixed in 0.3.81). Pinned intentionally for lab environment. [NVD](https://nvd.nist.gov/vuln/detail/CVE-2025-68664) |
 | LangChain-chroma | 1.1.0 | |
 | LangChain-huggingface | 1.2.1 | |
 | Ollama (Blog VM) | 0.1.33 | Intentionally vulnerable |
@@ -767,6 +767,5 @@ Twenty-three tests. Seventeen confirmed. Four infrastructure fixes required befo
 
 *Next: Episode 3.4C-Break -- The Pipeline. Indirect prompt injection, CVE-2025-68664, embedding inversion, and a self-propagating knowledge base worm. The database attacks were the warm-up.*
 
-{{< ai-walkthrough >}}
 
 **Published by Oob Skulden™ | Stay Paranoid.**
