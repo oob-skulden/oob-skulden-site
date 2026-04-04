@@ -1,5 +1,6 @@
 ---
-title: "I Broke Into an AI Chatbot Using a Fake Model. Here's Exactly How."
+title: "I Stood Up a Vulnerable AI Chatbot and Watched It Fall. CVE-2025-64496, Every Step."
+slug: "i-broke-into-an-ai-chatbot-using-a-fake-model-heres-exactly-how"
 date: 2026-03-06T12:00:00-05:00
 draft: false
 author: "Oob Skulden™"
