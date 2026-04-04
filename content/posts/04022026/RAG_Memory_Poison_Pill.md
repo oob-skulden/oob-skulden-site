@@ -1,5 +1,6 @@
 ---
-title: "Your AI Has a Memory. Anyone Can Read It. Anyone Can Poison It."
+title: "I Gave My AI Stack a Memory. Then I Poisoned It. Here's What Broke."
+slug: "your-ai-has-a-memory-anyone-can-read-it-anyone-can-poison-it"
 date: 2026-04-02T08:00:00-05:00
 draft: false
 author: "Oob Skulden™"

@@ -1,5 +1,6 @@
 ---
-title: "Your DLP Is Working. Your Data Is Leaking. Both Are True."
+title: "I Built DLP Into My AI Stack. Then I Found Six Ways Around It."
+slug: "your-dlp-is-working-your-data-is-leaking-both-are-true"
 date: 2026-03-21T01:00:00-05:00
 draft: false
 author: "Oob Skulden™"
