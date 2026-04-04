@@ -54,7 +54,6 @@ ShowShareButtons: false
 > **Disclaimer:** All testing was performed against infrastructure owned and operated by the author in a private lab environment. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (18 U.S.C. § 1030) and equivalent laws in other jurisdictions. This content is provided for educational and defensive security research purposes only. Do not test against systems you do not own or have explicit written authorization to test.
 >
 > This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies are derived from publicly available frameworks, published CVE advisories, and open-source tool documentation. All tools referenced are free, open-source, and publicly available.
-{{< ai-walkthrough >}}
 
 
 
@@ -111,7 +110,6 @@ This is the complete, unfiltered lab notebook from hardening a Grafana monitorin
 
 The methodology is dead simple: **one step at a time. Explain. Execute. Validate. Proceed.** That rule got established early, after the very first vulnerability fix went sideways because I tried to combine steps and skip explanations. More on that in a moment.
 
-{{< youtube rxBVwtKpdfA >}}
 
 ---
 
