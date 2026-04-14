@@ -88,7 +88,7 @@ UseHugoToc: true
 >
 > This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies >
 
-{{< youtube FM0qsMwEFl48MiKW >}}
+{{< youtube F48sC0R1Isg >}}
 
 Every good heist movie starts the same way. The crew cases the joint. They study the layout, map the exits, figure out where the guards are and when they rotate. Nobody shows up with a blowtorch and a prayer.
 
