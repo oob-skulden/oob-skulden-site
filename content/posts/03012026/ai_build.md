@@ -424,6 +424,8 @@ Write down that UUID. It is the payload for the admin JWT forgery in 3.2B Step 1
 
 ## The Workspace Tools Problem
 
+{{< youtube MDduBdGjMsI >}}
+
 After creating the victim account, verify the permissions:
 
 ```bash
