@@ -88,6 +88,8 @@ UseHugoToc: true
 >
 > This content represents personal educational work conducted in a home lab environment on personal equipment. It does not reflect the views, opinions, or positions of any employer or affiliated organization. All security methodologies >
 
+{{< youtube FM0qsMwEFl48MiKW >}}
+
 Every good heist movie starts the same way. The crew cases the joint. They study the layout, map the exits, figure out where the guards are and when they rotate. Nobody shows up with a blowtorch and a prayer.
 
 [Episode 3.2B](/posts/ep3-2b-break/) is the heist. CVE-2025-64496, a fake model server, a stolen JWT, and a chain of escalations that ends with full admin control from a single chat message. It is genuinely alarming and we documented every step.
